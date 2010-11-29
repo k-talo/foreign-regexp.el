@@ -46,14 +46,15 @@
 ;;      Also replaces text by a pattern and replacement strings
 ;;      when required.
 ;;
-;;         (*) Currently, only perl is supported.
+;;         (*) Ruby (v1.9 or later) script is predefined in
+;;             this file.
 ;;
 ;;   2. Browse the result of search operation produced by external program
 ;;      (...and apply the result of replacement operations if required)
 ;;      in Emacs user interface like `occur', `query-replace' and `isearch'.
 ;;
 ;; As a consequence, you can search and replace with regular expression
-;; of the perl (and with that of another command in the future) in Emacs.
+;; of the ruby (and with that of another command in the future) in Emacs.
 ;;
 ;;
 ;; FYI: If you are interested in building regular expression by `re-builder'
@@ -84,6 +85,8 @@
 ;;  M-x alien-search/occur RET PATTERN RET
 ;;  M-x alien-search/isearch-forward RET PATTERN
 ;;  M-x alien-search/isearch-forward RET RET PATTERN RET
+;;  M-x alien-search/isearch-backward RET PATTERN
+;;  M-x alien-search/isearch-backward RET RET PATTERN RET
 ;;
 ;; 
 ;; WISH LIST
@@ -94,12 +97,14 @@
 ;; - Better handling of exceptions from external commands,
 ;;   especially syntax error regarding to regular expression
 ;;   in isearch session.
-;; - Better response.
+;; - Better response?
 ;; - Write tests.
 
 ;;; Change Log:
 
 ;;; Code:
+
+(provide 'alien-search)
 
 (eval-when-compile (require 'cl))
 
@@ -131,10 +136,12 @@
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/search-by-external-cmd cmd pattern &optional replacement 
-;;                                       display-msg)                  => VOID
+;;  (alien-search/search-by-external-cmd cmd default-shell-script pattern
+;;                                       &optional replacement  display-msg)
+;;                                                                     => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/search-by-external-cmd (cmd pattern &optional replacement display-msg)
+(defun alien-search/search-by-external-cmd (cmd default-shell-script pattern
+                                                &optional replacement display-msg)
   "Scan current buffer with external command to detect matching
 texts by PATTERN.
 
@@ -147,29 +154,43 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
          (fn-out-pattern     (make-temp-name base))
          (fn-out-replacement (make-temp-name base))
          (fn-in-result       (make-temp-name base))
-         (cmd-basename       (file-name-nondirectory cmd))
+         (fn-script          (make-temp-name base))
+         (cmd-basename       (if cmd
+                                 (file-name-nondirectory cmd)
+                               "defalut-shell-script"))
          (proc-output-buf    (get-buffer-create " *alien-search*"))
          (cur-buf            (current-buffer))
          (orig-file-modes    (default-file-modes))
          result)
     (unwind-protect
         (progn
-          (set-default-file-modes #o0600)
-          
+
           ;; Save informations, which have to be passed to 
           ;; external command, to temporally files.
-          (with-temp-file fn-out-body
-            (set-buffer-file-coding-system 'utf-8-unix)
-            (insert (with-current-buffer cur-buf
-                      (buffer-substring (point-min) (point-max)))))
-          (with-temp-file fn-out-pattern
-            (set-buffer-file-coding-system 'utf-8-unix)
-            (insert pattern))
-          (when replacement
-            (with-temp-file fn-out-replacement
+          (unwind-protect 
+              (progn
+                (set-default-file-modes #o0600)
+                
+                (with-temp-file fn-out-body
+                  (set-buffer-file-coding-system 'utf-8-unix)
+                  (insert (with-current-buffer cur-buf
+                            (buffer-substring (point-min) (point-max)))))
+                (with-temp-file fn-out-pattern
+                  (set-buffer-file-coding-system 'utf-8-unix)
+                  (insert pattern))
+                (when replacement
+                  (with-temp-file fn-out-replacement
+                    (set-buffer-file-coding-system 'utf-8-unix)
+                    (insert replacement))))
+            (set-default-file-modes orig-file-modes))
+
+          ;; Save default-shell-script to file when required.
+          (when (not cmd)
+            (with-temp-file fn-script
               (set-buffer-file-coding-system 'utf-8-unix)
-              (insert replacement)))
-          
+              (insert default-shell-script))
+            (set-file-modes fn-script #o0700)
+            (setq cmd fn-script))
           
           (when display-msg
             (message "[alien-search] Running..."))
@@ -184,7 +205,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                                  ,@(if replacement (list fn-out-replacement) nil)))))
             (when (not (and (numberp status)
                             (zerop status)))
-              (error "[alien-search] %s exited with status \"%s\".\n%s"
+              (error "[alien-search] %s exited with status \"%s\":\n%s"
                      cmd-basename
                      status
                      (with-current-buffer proc-output-buf
@@ -206,11 +227,11 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           result)
       
       ;; Cleanup.
-      (set-default-file-modes orig-file-modes)
       (and (file-exists-p fn-out-pattern    ) (delete-file fn-out-pattern    ))
       (and (file-exists-p fn-out-replacement) (delete-file fn-out-replacement))
       (and (file-exists-p fn-out-body       ) (delete-file fn-out-body       ))
       (and (file-exists-p fn-in-result      ) (delete-file fn-in-result      ))
+      (and (file-exists-p fn-script         ) (delete-file fn-script         ))
       (kill-buffer proc-output-buf))))
 
 
@@ -220,12 +241,14 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/replace/external-cmd "~/bin/query-replace-perl-aux.pl"
-  "The command to use to execute actual search operation.
+(defcustom alien-search/replace/external-cmd nil
+  "Path of the command to use to execute actual search operation.
 
 Four arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
+
+      The text in this file is encoded in `utf-8-unix'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -249,11 +272,75 @@ Four arguments describe below will be passed to the script.
  4th: Path of a file in which the replacement expression is written.
       The script have a responsibility to interpolate variables
       in the expression on each match, then write them to the file
-      specified by 2nd argument."
+      specified by 2nd argument.
+
+      The text in this file must be encoded in `utf-8-unix'."
   :type 'string
   :group 'alien-search)
 
-(defvar alien-search/replace/defaults nil)
+(defcustom alien-search/replace/default-shell-script
+  "#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def escape_str_to_eval! (str)
+  str.gsub!(/\"/ ){'\\\\\"'}
+end
+
+def escape_ruby_str_for_emacs! (str)
+  str.gsub!(/\\\\/) {'\\\\\\\\'}
+  str.gsub!(/\"/ ) {'\\\\\"'}
+end
+
+def main ()
+  fn_in, fn_out, fn_pat, fn_rpl = ARGV
+  
+  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  str_rpl = open(fn_rpl, 'r:UTF-8') {|f| f.read}
+  
+  escape_str_to_eval!(str_rpl)
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\"
+  
+  str_in.scan( Regexp.new(str_pat) ) do |m|
+    replacement = eval '\"' + str_rpl + '\"'
+    escape_ruby_str_for_emacs!(replacement)
+    
+    print '('
+    print Regexp.last_match.begin(0), ' '
+    print Regexp.last_match.end(0),   ' '
+    print '\"', replacement, '\"'
+    print ')'
+  end
+  
+  print \"))\\n\";
+  print \";;; EOF\\n\";
+  
+  exit 0
+  
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+"
+  "A shell script which will be run as a command
+`alien-search/replace/external-cmd' when it has nil value."
+  :type  'string
+  :group 'alien-search)
+
+
+(defvar alien-search/replace/defaults nil
+  "Default values of FROM-STRING and TO-STRING for `alien-search/query-replace'.
+
+See also `query-replace-defaults'.")
 
 
 ;; ----------------------------------------------------------------------------
@@ -277,7 +364,7 @@ more information."
                 (query-replace-to-history-variable   'alien-search/history)
                 (query-replace-defaults              alien-search/replace/defaults))
             (prog1 (query-replace-read-args
-                    (concat "Query replace perl"
+                    (concat "Query replace alien"
                             (if (and transient-mark-mode mark-active) " in region" ""))
                     t)
               (setq alien-search/replace/defaults query-replace-defaults)))))
@@ -315,11 +402,12 @@ alien-search/replace/replacement of each overlay.
 
 Returns position of the neighborhood overlay of a pointer in
 the list `alien-search/replace/ovs-on-match/data'."
-  (let* ((cmd    alien-search/replace/external-cmd)
-         (offset (point-min))
-         (result (alien-search/search-by-external-cmd cmd
-                                                      pattern
-                                                      replacement)))
+  (let* ((offset (point-min))
+         (result (alien-search/search-by-external-cmd
+                  alien-search/replace/external-cmd
+                  alien-search/replace/default-shell-script
+                  pattern
+                  replacement)))
     (alien-search/replace/parse-search-result result offset min max)
     
     ;; Detect index of neighborhood overlay of a pointer.
@@ -344,7 +432,7 @@ the list `alien-search/replace/ovs-on-match/data'."
   (save-excursion
     (let ((data    nil)
           (cur-buf (current-buffer)))
-      (message "[alien-search] Parsing search results from perl...")
+      ;;(message "[alien-search] Parsing search results from external command...")
       (dolist (lst result)
         (let* ((beg         (+ (nth 0 lst) offset))
                (end         (+ (nth 1 lst) offset))
@@ -352,7 +440,8 @@ the list `alien-search/replace/ovs-on-match/data'."
           (when (and (not (and min (< beg min)))
                      (not (and max (< max end))))
             (alien-search/replace/ovs-on-match/add beg end cur-buf replacement))))
-      (message "[alien-search] Parsing search results from perl...done"))))
+      ;;(message "[alien-search] Parsing search results from external command...done")
+      )))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/perform-replace (from-string replacement
@@ -764,12 +853,14 @@ alien-search/replace/replacement."
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/occur/external-cmd "~/bin/occur-perl-aux.pl"
-  "The command to use to execute actual search operation.
+(defcustom alien-search/occur/external-cmd nil
+  "Path of the command to use to execute actual search operation.
 
 Three arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
+
+      The text in this file is encoded in `utf-8-unix'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -799,6 +890,61 @@ Three arguments describe below will be passed to the script.
       end positions of each match to the file specified by 2nd argument."
   :type  'string
   :group 'alien-search)
+
+(defcustom alien-search/occur/default-shell-script
+  "#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def main ()
+  fn_in, fn_out, fn_pat = ARGV
+  
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  offset = 0
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\"
+  
+  open(fn_in, 'r:UTF-8') do |file_in|
+    while line = file_in.gets do
+      matched = 0
+      len = line.length;
+      
+      line.scan( Regexp.new(str_pat) ) do
+        print '(' if matched == 0
+        print '('
+        print offset + Regexp.last_match.begin(0), ' '
+        print offset + Regexp.last_match.end(0)
+        print ')'
+        matched += 1;
+      end
+      print ')' if matched != 0
+      
+      offset += len
+    end
+  end
+  
+  print \"))\\n\";
+  print \";;; EOF\\n\";
+  
+  exit 0
+  
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+"
+  "A shell script which will be run as a command
+`alien-search/occur/external-cmd' when it has nil value."
+  :type  'string
+  :group 'alien-search)
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -845,15 +991,17 @@ Three arguments describe below will be passed to the script.
       ;; Map over all the buffers
       (dolist (buf buffers)
         (when (buffer-live-p buf)
-          (let ((cmd alien-search/occur/external-cmd)
-                (matches 0)	;; count of matched lines
+          (let ((matches 0)	;; count of matched lines
                 (curstring "")
                 (inhibit-field-text-motion t)
                 (headerpt (with-current-buffer out-buf (point)))
                 (*search-result-alst* nil)
                 (matches-in-line nil))
             (with-current-buffer buf
-              (setq result (alien-search/search-by-external-cmd cmd regexp))
+              (setq result (alien-search/search-by-external-cmd
+                            alien-search/occur/external-cmd
+                            alien-search/occur/default-shell-script
+                            regexp))
               (or coding
                   ;; Set CODING only if the current buffer locally
                   ;; binds buffer-file-coding-system.
@@ -957,7 +1105,6 @@ Three arguments describe below will be passed to the script.
       ;; Return the number of matches
       globalcount)))
 
-
   
 ;;; ===========================================================================
 ;;;
@@ -965,12 +1112,14 @@ Three arguments describe below will be passed to the script.
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/isearch/external-cmd "~/bin/isearch-perl-aux.pl"
-  "The command to use to execute actual search operation.
+(defcustom alien-search/isearch/external-cmd nil
+  "Path of the command to use to execute actual search operation.
 
 Three arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
+
+      The text in this file is encoded in `utf-8-unix'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -993,6 +1142,49 @@ Three arguments describe below will be passed to the script.
   :type  'string
   :group 'alien-search)
 
+(defcustom alien-search/isearch/default-shell-script
+  "#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def main ()
+  fn_in, fn_out, fn_pat = ARGV
+  
+  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\";
+  
+  str_in.scan( Regexp.new(str_pat) ) do
+    print '('
+    print Regexp.last_match.begin(0), ' '
+    print Regexp.last_match.end(0)
+    print ')'
+  end
+  
+  print \"))\\n\";
+  print \";;; EOF\\n\";
+  
+  exit 0
+
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+"
+  "A shell script which will be run as a command
+`alien-search/isearch/external-cmd' when it has nil value."
+  :type  'string
+  :group 'alien-search)
+
+
 (defvar alien-search/isearch/.cached-data nil
   "Private variable.")
 (defvar alien-search/isearch/.last-regexp nil
@@ -1006,9 +1198,9 @@ Three arguments describe below will be passed to the script.
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/isearch &optional not-regexp no-recursive-edit) => VOID
+;;  (alien-search/isearch-forward &optional not-regexp no-recursive-edit) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/isearch (&optional not-regexp no-recursive-edit)
+(defun alien-search/isearch-forward (&optional not-regexp no-recursive-edit)
   "Do isearch with a help from alien command.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
@@ -1026,6 +1218,25 @@ more information."
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
   (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
+
+(defun alien-search/isearch-backward (&optional not-regexp no-recursive-edit)
+  "Do isearch with a help from alien command.
+
+See `isearch-forward-regexp' and `isearch-backward-regexp' for
+more information."
+  (interactive "P\np")
+  (setq alien-search/isearch/.cached-data nil)
+  (setq alien-search/isearch/.last-regexp nil)
+  
+  ;; Setup `isearch-search-fun-function'.
+  (when (not (boundp 'alien-search/isearch/orig-isearch-search-fun-function))
+    (setq alien-search/isearch/orig-isearch-search-fun-function
+          isearch-search-fun-function))
+  (setq isearch-search-fun-function #'alien-search/isearch/isearch-search-fun-function)
+  (add-hook 'isearch-mode-end-hook
+            'alien-search/isearch/.isearch-mode-end-hook-fn)
+  
+  (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1075,6 +1286,7 @@ and `re-search-backward' while isearch by alien-search is on."
             (not alien-search/isearch/.cached-data))
     (setq alien-search/isearch/.cached-data
           (alien-search/search-by-external-cmd alien-search/isearch/external-cmd
+                                               alien-search/isearch/default-shell-script
                                                regexp))
     (setq alien-search/isearch/.last-regexp
           regexp))
