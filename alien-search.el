@@ -437,7 +437,7 @@ more information."
                 (query-replace-to-history-variable   'alien-search/history)
                 (query-replace-defaults              alien-search/replace/defaults))
             (prog1 (query-replace-read-args
-                    (concat "Query replace alien"
+                    (concat "Query replace alien regexp"
                             (if (and transient-mark-mode mark-active) " in region" ""))
                     t)
               (setq alien-search/replace/defaults query-replace-defaults)))))
@@ -1043,7 +1043,7 @@ main
 (defun alien-search/occur (regexp &optional nlines)
   (interactive (let ((regexp-history alien-search/history))
                  (prog1
-                     (occur-read-primary-args)
+                     (alien-search/occur-read-primary-args)
                    (setq alien-search/history regexp-history))))
   (let ((orig-occur-engine-fn (symbol-function 'occur-engine)))
     (setf (symbol-function 'occur-engine)
@@ -1059,6 +1059,17 @@ main
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/occur-read-primary-args) => LIST
+;; ----------------------------------------------------------------------------
+;; Based on `occur-read-primary-args'.
+;; Just for prompt message.
+(defun alien-search/occur-read-primary-args ()
+  (list (read-regexp "List lines matching alien regexp"
+                     (car regexp-history))
+        (when current-prefix-arg
+          (prefix-numeric-value current-prefix-arg))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/occur/occur-engine regexp buffers out-buf nlines
@@ -1303,6 +1314,10 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
+  ;; Just for prompt message.
+  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+  (ad-activate 'isearch-message-prefix)
+  
   (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
 
 (defun alien-search/isearch-backward (&optional not-regexp no-recursive-edit)
@@ -1322,7 +1337,30 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
+  ;; Just for prompt message.
+  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+  (ad-activate 'isearch-message-prefix)
+  
   (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+;; Just for prompt message.
+(defadvice isearch-message-prefix (after alien-search/isearch/modify-prompt
+                                         (&optional c-q-hack ellipsis nonincremental))
+  (when (string-match "\\b\\(\\([Rr]\\)egexp\\)\\b" ad-return-value)
+    (setq ad-return-value
+          (replace-match (propertize
+                          (if (string= "R" (match-string 2 ad-return-value))
+                              "Alien regexp"
+                            "alien regexp")
+                          'face 'minibuffer-prompt)
+                         t t ad-return-value))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1341,6 +1379,11 @@ more information."
       (setq isearch-search-fun-function
             alien-search/isearch/orig-isearch-search-fun-function)
       (makunbound 'alien-search/isearch/orig-isearch-search-fun-function))
+    
+    ;; Just for prompt message.
+    (ad-disable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+    (ad-activate 'isearch-message-prefix)
+    
     (remove-hook 'isearch-mode-end-hook
                  'alien-search/isearch/.isearch-mode-end-hook-fn)))
 
