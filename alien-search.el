@@ -52,17 +52,6 @@
 ;;      `query-replace'.
 ;;
 ;;
-;; FYI: If you are interested in building regular expression by `re-builder'
-;;      with perl syntax, try `re-builder-x.el' which has been distributed
-;;      as a part of perl module package Emacs::PDE by Ye Wenbin at:
-;;
-;;          <http://cpansearch.perl.org/src/YEWENBIN/Emacs-PDE-0.2.16/>
-;;
-;;      and also see documentation of `re-builder-x.el' at:
-;;
-;;          <http://cpansearch.perl.org/src/YEWENBIN/Emacs-PDE-0.2.16/lisp/doc/pde.html#re_002dbuilder_002dx>
-;;
-;;
 ;; INSTALLING
 ;; ==========
 ;; To install this library, save this file to a directory in your
