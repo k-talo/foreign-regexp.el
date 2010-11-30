@@ -40,15 +40,16 @@
 ;;
 ;; What this library does are:
 ;;
-;;   1. Search a pattern from text in current buffer with external
+;;   1. Search for a pattern from text in current buffer with external
 ;;      program(*) in manner of their regular expression.
 ;;      
 ;;         (*) Ruby (v1.9 or later is required) scripts are
 ;;             predefined in this file.
 ;;
-;;   2. Browse the result of the search operation produced by external program
-;;      (...and apply the result of replacement operations if required)
-;;      through Emacs user interface like `occur', `query-replace' and `isearch'.
+;;   2. Browse result of the search operation produced by external program
+;;      (...and apply result of the replacement operations if required)
+;;      through Emacs user interface like `occur', `isearch' and
+;;      `query-replace'.
 ;;
 ;;
 ;; FYI: If you are interested in building regular expression by `re-builder'
