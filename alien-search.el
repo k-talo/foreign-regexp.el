@@ -99,7 +99,7 @@
 ;; manner of Ruby to search/replace operations.
 ;;
 ;; These programs accepts regular expression of Ruby as PATTERN,
-;; and interpolates special variables like $', $`, $' and $0..$9
+;; and interpolates special variables $&, $`, $', $+ and $1..$9
 ;; in REPLACEMENT as if it has been inside of double quotes
 ;; in a block of String#gsub method.
 ;;
