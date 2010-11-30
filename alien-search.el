@@ -1,4 +1,4 @@
-;; alien-search.el --- search and replace with a help from alien programs.
+;; alien-search.el --- search and replace with alien regular expression.
 
 ;; Copyright (C) 2010 K-talo Miyazaki, all rights reserved.
 
@@ -43,18 +43,12 @@
 ;;   1. Search a pattern from text in current buffer with external
 ;;      program(*) in manner of their regular expression.
 ;;      
-;;      Also replaces text by a pattern and replacement strings
-;;      when required.
+;;         (*) Ruby (v1.9 or later is required) scripts are
+;;             predefined in this file.
 ;;
-;;         (*) Ruby (v1.9 or later) script is predefined in
-;;             this file.
-;;
-;;   2. Browse the result of search operation produced by external program
+;;   2. Browse the result of the search operation produced by external program
 ;;      (...and apply the result of replacement operations if required)
-;;      in Emacs user interface like `occur', `query-replace' and `isearch'.
-;;
-;; As a consequence, you can search and replace with regular expression
-;; of the ruby (and with that of another command in the future) in Emacs.
+;;      through Emacs user interface like `occur', `query-replace' and `isearch'.
 ;;
 ;;
 ;; FYI: If you are interested in building regular expression by `re-builder'
@@ -80,15 +74,95 @@
 ;;
 ;; USING
 ;; =====
-;; 
-;;  M-x alien-search/query-replace RET PATTERN RET REPLACEMENT RET
+;;
 ;;  M-x alien-search/occur RET PATTERN RET
+;;
+;;    `occur' with regular expression in manner of external program.
+;;
+;;
+;;  M-x alien-search/query-replace RET PATTERN RET REPLACEMENT RET
+;;
+;;    `query-replace' with regular expression in manner of external
+;;    program.
+;;
+;;
 ;;  M-x alien-search/isearch-forward RET PATTERN
-;;  M-x alien-search/isearch-forward RET RET PATTERN RET
 ;;  M-x alien-search/isearch-backward RET PATTERN
+;;
+;;    `isearch' with regular expression in manner of external program.
+;;
+;;
+;;  M-x alien-search/isearch-forward RET RET PATTERN RET
 ;;  M-x alien-search/isearch-backward RET RET PATTERN RET
 ;;
+;;    Non-incremental search with regular expression in manner of
+;;    external program.
+;;
+;;
+;;  Note that notation of PATTERN and REPLACEMENT are different
+;;  for each external program.
+;;
+;;
+;; USING WITH DEFAULT EXTERNAL PROGRAMS
+;; ====================================
+;; Default external programs, that are defined this file, brings
+;; manner of Ruby to search/replace operations.
+;;
+;; These programs accepts regular expression of Ruby as PATTERN,
+;; and interpolates special variables like $', $`, $' and $0..$9
+;; in REPLACEMENT as if it has been inside of double quotes
+;; in a block of String#gsub method.
+;;
+;;   Example:
+;;
+;;     The command
+;;
+;;       M-x alien-search/query-replace RET (\d+)-(\d+) RET #$1...#$2 RET
+;;
+;;     replaces text in buffer
+;;
+;;       123-456
+;;
+;;     with text
+;;
+;;       123...456
+;;   
 ;; 
+;; Key map Examples
+;; ================
+;; (when (require 'alien-search nil t)
+;;   (define-key esc-map [(f4)]  'alien-search/occur)
+;;   ;; Override `query-replace'.
+;;   (define-key esc-map [?\C-%] 'alien-search/query-replace)
+;;   ;; Override `isearch-forward-regexp'.
+;;   (define-key esc-map [?\C-s] 'alien-search/isearch-forward)
+;;   ;; Override `isearch-backward-regexp'.
+;;   (define-key esc-map [?\C-r] 'alien-search/isearch-backward))
+;;
+;;
+;; FOR HACKERS
+;; ===========
+;; This library requires three external programs to execute
+;; `occur', `query-replace' and `isearch' with regular expressions
+;; that are alien to emacs.
+;;
+;; If you want to write these external programs by your choice
+;; of language, see help documents of these variables:
+;; 
+;;   `alien-search/replace/external-cmd'
+;;   `alien-search/occur/external-cmd'
+;;   `alien-search/isearch/external-cmd'
+;;
+;; and set path to the programs to the variables when you wrote
+;; them.
+;;
+;; See also default external programs written in Ruby, defined as:
+;;
+;;   `alien-search/replace/default-shell-script'
+;;   `alien-search/occur/default-shell-script'
+;;   `alien-search/isearch/default-shell-script'
+;;
+;;
 ;; WISH LIST
 ;; =========
 ;; - Toggle case (in)?sensitive search?
@@ -105,6 +179,8 @@
 ;;; Code:
 
 (provide 'alien-search)
+(defconst alien-search/version "0.0")
+
 
 (eval-when-compile (require 'cl))
 
@@ -137,11 +213,10 @@
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/search-by-external-cmd cmd default-shell-script pattern
-;;                                       &optional replacement  display-msg)
-;;                                                                     => VOID
+;;                                       &optional replacement)        => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/search-by-external-cmd (cmd default-shell-script pattern
-                                                &optional replacement display-msg)
+                                                &optional replacement)
   "Scan current buffer with external command to detect matching
 texts by PATTERN.
 
@@ -157,7 +232,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
          (fn-script          (make-temp-name base))
          (cmd-basename       (if cmd
                                  (file-name-nondirectory cmd)
-                               "defalut-shell-script"))
+                               "default-shell-script"))
          (proc-output-buf    (get-buffer-create " *alien-search*"))
          (cur-buf            (current-buffer))
          (orig-file-modes    (default-file-modes))
@@ -192,8 +267,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
             (set-file-modes fn-script #o0700)
             (setq cmd fn-script))
           
-          (when display-msg
-            (message "[alien-search] Running..."))
+          ;;(message "[alien-search] Running...")
           
           ;; Do search by external command.
           (let ((status (apply #'call-process
@@ -211,8 +285,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                      (with-current-buffer proc-output-buf
                        (buffer-substring (point-min) (point-max))))))
           
-          (when display-msg
-            (message "[alien-search] Running...done"))
+          ;;(message "[alien-search] Running...done")
           
           (with-current-buffer proc-output-buf
             (when (/= (point-min) (point-max))
@@ -414,8 +487,8 @@ the list `alien-search/replace/ovs-on-match/data'."
     (position (car (member-if
                     #'(lambda (ov)
                         (<= (point) (overlay-start ov)))
-                    alien-search/replace/ovs-on-match/data))
-              alien-search/replace/ovs-on-match/data)))
+                    (alien-search/replace/ovs-on-match/get-all)))
+              (alien-search/replace/ovs-on-match/get-all))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/parse-search-result result offset) => OVERLAYS
@@ -449,8 +522,12 @@ the list `alien-search/replace/ovs-on-match/data'."
 ;;                                     &optional ignore map start end) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/replace/perform-replace (from-string replacement
-                                                         query-flag ignore ignore
-                                                         &optional ignore map start end)
+                                                         query-flag
+                                                         ignore/regexp-flag
+                                                         ignore/delimited-flag
+                                                         &optional
+                                                         ignore/repeat-count
+                                                         map start end)
   "Replacement of `perform-replace' for alien search.
 
 Note that \"\\?\" in string is not supported like
@@ -472,6 +549,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
          (keep-going t)
          (stack nil)
          (replace-count 0)
+         (multi-buffer nil)
          (recenter-last-op nil)	; Start cycling order with initial position.
          
          (min nil)
@@ -487,7 +565,8 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
                       "Query replacing %s with %s: (\\<query-replace-map>\\[help] for mini buffer help) ")
                      minibuffer-prompt-properties)))
          (idx nil)
-         (regexp-flag t))
+         (regexp-flag t)
+         real-replacement)
 
     (cond
      ((stringp replacement)
@@ -804,6 +883,12 @@ Put overlay on current match."
 (defvar alien-search/replace/ovs-on-match/data nil)
 (make-variable-buffer-local 'alien-search/replace/ovs-on-match/data)
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/replace/ovs-on-match/get-all) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/replace/ovs-on-match/get-all ()
+  "Get all of overlays put on each match."
+  alien-search/replace/ovs-on-match/data)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/ovs-on-match/add beg end buf replacement) => LIST
@@ -996,7 +1081,8 @@ main
                 (inhibit-field-text-motion t)
                 (headerpt (with-current-buffer out-buf (point)))
                 (*search-result-alst* nil)
-                (matches-in-line nil))
+                (matches-in-line nil)
+                result)
             (with-current-buffer buf
               (setq result (alien-search/search-by-external-cmd
                             alien-search/occur/external-cmd
@@ -1251,7 +1337,6 @@ more information."
 (defun alien-search/isearch/.isearch-mode-end-hook-fn ()
   "Clean up environment when isearch by alien-search is finished."
   (when (not isearch-nonincremental)
-    ;;(message "remove-hook!%s" (backtrace))
     (when (boundp 'alien-search/isearch/orig-isearch-search-fun-function)
       (setq isearch-search-fun-function
             alien-search/isearch/orig-isearch-search-fun-function)
