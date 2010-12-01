@@ -215,14 +215,15 @@ contains texts passed from Emacs to external programs."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/search-by-external-program prog-path default-shell-script
-;;                                           pattern &optional replacement)
-;;                                                                   => RESULT
+;;  (alien-search/run-external-program prog-path default-shell-script body
+;;                                     pattern &optional replacement) => RESULT
 ;; ----------------------------------------------------------------------------
-(defun alien-search/search-by-external-program (prog-path default-shell-script pattern
-                                                &optional replacement)
-  "Scan current buffer with external program to detect matching
-texts by PATTERN.
+(defun alien-search/run-external-program (prog-path default-shell-script
+                                                    body
+                                                    pattern
+                                                    &optional
+                                                    replacement)
+  "Run external program to execute oerations regarding to search.
 
 NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                       on each match by external program."
@@ -252,10 +253,10 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
               (progn
                 (set-default-file-modes #o0600)
                 
-                (with-temp-file fn-out-body
-                  (set-buffer-file-coding-system coding-sys-out)
-                  (insert (with-current-buffer cur-buf
-                            (buffer-substring (point-min) (point-max)))))
+                (when body
+                  (with-temp-file fn-out-body
+                    (set-buffer-file-coding-system coding-sys-out)
+                    (insert body)))
                 (with-temp-file fn-out-pattern
                   (set-buffer-file-coding-system coding-sys-out)
                   (insert pattern))
@@ -279,10 +280,11 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           (let ((status (apply #'call-process
                                `(,prog-path
                                  nil ,(buffer-name proc-output-buf) nil
-                                 ,fn-out-body
+                                 ,@(if body (list fn-out-body) nil)
                                  ,fn-in-result
                                  ,fn-out-pattern
-                                 ,@(if replacement (list fn-out-replacement) nil)))))
+                                 ,@(if replacement (list fn-out-replacement) nil)
+                                 ))))
             (when (not (and (numberp status)
                             (zerop status)))
               (error "[alien-search] %s exited with status \"%s\":\n%s"
@@ -492,9 +494,10 @@ alien-search/replace/replacement of each overlay.
 Returns position of the neighborhood overlay of a pointer in
 the list `alien-search/replace/ovs-on-match/data'."
   (let* ((offset (point-min))
-         (result (alien-search/search-by-external-program
+         (result (alien-search/run-external-program
                   alien-search/replace/external-program
                   alien-search/replace/default-shell-script
+                  (buffer-substring (point-min) (point-max))
                   pattern
                   replacement)))
     (alien-search/replace/parse-search-result result offset min max)
@@ -1121,9 +1124,10 @@ when it has nil value."
                 (matches-in-line nil)
                 result)
             (with-current-buffer buf
-              (setq result (alien-search/search-by-external-program
+              (setq result (alien-search/run-external-program
                             alien-search/occur/external-program
                             alien-search/occur/default-shell-script
+                            (buffer-substring (point-min) (point-max))
                             regexp))
               (or coding
                   ;; Set CODING only if the current buffer locally
@@ -1447,9 +1451,10 @@ and `re-search-backward' while isearch by alien-search is on."
                         regexp))
             (not alien-search/isearch/.cached-data))
     (setq alien-search/isearch/.cached-data
-          (alien-search/search-by-external-program
+          (alien-search/run-external-program
            alien-search/isearch/external-program
            alien-search/isearch/default-shell-script
+           (buffer-substring (point-min) (point-max))
            regexp))
     (setq alien-search/isearch/.last-regexp
           regexp))
