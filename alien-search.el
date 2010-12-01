@@ -335,12 +335,14 @@ Four arguments describe below will be passed to the program.
  2nd: Path of a file to which the program should write the result
       of current search operation.
 
-      The form of the result should have a form like:
+      The external program have to output a form like:
 
         (setq result
               '((1st-MATCH-START 1st-MATCH-END \"REPLACEMENT-FOR-1st-MATCH\")
                 (2nd-MATCH-START 2nd-MATCH-END \"REPLACEMENT-FOR-2nd-MATCH\")
                 ...))
+
+      to this file.
 
       Note that each start and end position in the form should be
       an offset from beginning of the text which has been searched.
@@ -972,7 +974,7 @@ Three arguments describe below will be passed to the program.
  2nd: Path of a file to which the program should write the result
       of current search operation.
 
-      The form of the result should have a form like:
+      The external program have to output a form like:
 
         (setq result
               '(
@@ -986,6 +988,8 @@ Three arguments describe below will be passed to the program.
                 ((x-th-MATCH-START x-th-MATCH-END)
                  (y-th-MATCH-START y-th-MATCH-END)
                  ...)))
+
+      to this file.
 
       Note that each start and end position in the form should be
       an offset from beginning of the text which has been searched.
@@ -1252,12 +1256,14 @@ Three arguments describe below will be passed to the program.
  2nd: Path of a file to which the program should write the result
       of current search operation.
 
-      The form of the result should have a form like:
+      The external program have to output a form like:
 
         (setq result
               '((1st-MATCH-START 1st-MATCH-END)
                 (2nd-MATCH-START 2nd-MATCH-END)
                  ...))
+
+      to this file.
 
       Note that each start and end position in the form should be
       an offset from beginning of the text which has been searched.
