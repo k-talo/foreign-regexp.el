@@ -163,6 +163,7 @@
 ;;   in isearch session.
 ;; - Better response?
 ;; - Write tests.
+;; - validate-regexp by external command?
 
 ;;; Change Log:
 
@@ -191,6 +192,18 @@
   :type 'string
   :group 'alien-search)
 
+(defcustom alien-search/input-coding-system  'utf-8-unix
+  "Coding system to be used for decoding files which
+contains texts passed from external programs to Emacs."
+  :type  'coding-system
+  :group 'alien-search)
+
+(defcustom alien-search/output-coding-system 'utf-8-unix
+  "Coding system to be used for encoding files which
+contains texts passed from Emacs to external programs."
+  :type  'coding-system
+  :group 'alien-search)
+
 (defvar alien-search/history  nil
   "History list for some commands that runs alien-search.")
 
@@ -203,7 +216,7 @@
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/search-by-external-cmd cmd default-shell-script pattern
-;;                                       &optional replacement)        => VOID
+;;                                       &optional replacement)     => RESULT
 ;; ----------------------------------------------------------------------------
 (defun alien-search/search-by-external-cmd (cmd default-shell-script pattern
                                                 &optional replacement)
@@ -226,6 +239,8 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
          (proc-output-buf    (get-buffer-create " *alien-search*"))
          (cur-buf            (current-buffer))
          (orig-file-modes    (default-file-modes))
+         (coding-sys-out     alien-search/output-coding-system)
+         (coding-sys-in      alien-search/input-coding-system)
          result)
     (unwind-protect
         (progn
@@ -237,22 +252,22 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                 (set-default-file-modes #o0600)
                 
                 (with-temp-file fn-out-body
-                  (set-buffer-file-coding-system 'utf-8-unix)
+                  (set-buffer-file-coding-system coding-sys-out)
                   (insert (with-current-buffer cur-buf
                             (buffer-substring (point-min) (point-max)))))
                 (with-temp-file fn-out-pattern
-                  (set-buffer-file-coding-system 'utf-8-unix)
+                  (set-buffer-file-coding-system coding-sys-out)
                   (insert pattern))
                 (when replacement
                   (with-temp-file fn-out-replacement
-                    (set-buffer-file-coding-system 'utf-8-unix)
+                    (set-buffer-file-coding-system coding-sys-out)
                     (insert replacement))))
             (set-default-file-modes orig-file-modes))
 
           ;; Save default-shell-script to file when required.
           (when (not cmd)
             (with-temp-file fn-script
-              (set-buffer-file-coding-system 'utf-8-unix)
+              (set-buffer-file-coding-system coding-sys-out)
               (insert default-shell-script))
             (set-file-modes fn-script #o0700)
             (setq cmd fn-script))
@@ -284,7 +299,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                        (buffer-substring (point-min) (point-max)))))
           
           ;; Parse result from external command.
-          (let ((coding-system-for-read 'utf-8-unix))
+          (let ((coding-system-for-read coding-sys-in))
             ;; Loaded data will be stored to the local variable `result'.
             (load (expand-file-name fn-in-result) nil t t))
           result)
@@ -311,7 +326,8 @@ Four arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
 
-      The text in this file is encoded in `utf-8-unix'.
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -327,17 +343,24 @@ Four arguments describe below will be passed to the script.
       an offset from beginning of the text which has been searched.
       (This means each number should be started from 0, not from 1)
 
+      The text in this file must be encoded in the value of
+      `alien-search/input-coding-system'.
+
  3rd: Path of a file in which the pattern we want to search is written.
       The script have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'.
 
  4th: Path of a file in which the replacement expression is written.
       The script have a responsibility to interpolate variables
       in the expression on each match, then write them to the file
       specified by 2nd argument.
 
-      The text in this file must be encoded in `utf-8-unix'."
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'."
   :type 'string
   :group 'alien-search)
 
@@ -935,7 +958,8 @@ Three arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
 
-      The text in this file is encoded in `utf-8-unix'.
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -959,10 +983,16 @@ Three arguments describe below will be passed to the script.
       an offset from beginning of the text which has been searched.
       (This means each number should be started from 0, not from 1)
 
+      The text in this file must be encoded in the value of
+      `alien-search/input-coding-system'.
+
  3rd: Path of a file in which the pattern we want to search is written.
       The script have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument."
+      end positions of each match to the file specified by 2nd argument.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'."
   :type  'string
   :group 'alien-search)
 
@@ -1206,7 +1236,8 @@ Three arguments describe below will be passed to the script.
 
  1st: Path of a file which contains the text to be searched.
 
-      The text in this file is encoded in `utf-8-unix'.
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'.
 
  2nd: Path of a file to which the script should write the result
       of current search operation.
@@ -1222,10 +1253,16 @@ Three arguments describe below will be passed to the script.
       an offset from beginning of the text which has been searched.
       (This means each number should be started from 0, not from 1)
 
+      The text in this file must be encoded in the value of
+      `alien-search/input-coding-system'.
+
  3rd: Path of a file in which the pattern we want to search is written.
       The script have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument."
+      end positions of each match to the file specified by 2nd argument.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'."
   :type  'string
   :group 'alien-search)
 
