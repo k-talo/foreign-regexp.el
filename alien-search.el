@@ -93,6 +93,10 @@
 ;;  for each external program.
 ;;
 ;;
+;;  If you want to escape meta characters in lisp string,
+;;  use function `alien-search/quote-meta'.
+;;
+;;
 ;; USING WITH DEFAULT EXTERNAL PROGRAMS
 ;; ====================================
 ;; Default external programs, that are defined this file, brings
@@ -132,9 +136,10 @@
 ;;
 ;; FOR HACKERS
 ;; ===========
-;; This library requires three external programs to execute
-;; `occur', `query-replace' and `isearch' with regular expressions
-;; that are alien to emacs.
+;; This library requires four external programs to execute
+;; `alien-search/occur', `alien-search/query-replace',
+;; `alien-search/isearch-*' and `alien-search/quote-meta'
+;; with regular expressions that are alien to emacs.
 ;;
 ;; If you want to write these external programs by your choice
 ;; of language, see help documents of these variables:
@@ -142,6 +147,7 @@
 ;;   `alien-search/replace/external-program'
 ;;   `alien-search/occur/external-program'
 ;;   `alien-search/isearch/external-program'
+;;   `alien-search/quote-meta/external-program'
 ;;
 ;; and set path to the programs to the variables when you wrote
 ;; them.
@@ -151,6 +157,7 @@
 ;;   `alien-search/replace/default-shell-script'
 ;;   `alien-search/occur/default-shell-script'
 ;;   `alien-search/isearch/default-shell-script'
+;;   `alien-search/quote-meta/default-shell-script'
 ;;
 ;;
 ;; WISH LIST
@@ -1497,5 +1504,95 @@ and `re-search-backward' while isearch by alien-search is on."
           (set-match-data (list beg end))
           (goto-char beg)
           beg)))))
+
+
+;;; ===========================================================================
+;;;
+;;;  quote meta characters by external program.
+;;;
+;;; ===========================================================================
+
+(defcustom alien-search/quote-meta/external-program nil
+  "Path of an external program to use to execute actual
+quote-meta operation.
+
+Two arguments describe below will be passed to the program.
+
+ 1st: Path of a file to which the program should write the result
+      of quote-meta operation.
+
+      The external program have to output a form like:
+
+        (setq result \"quoted string\")
+
+      to this file.
+
+      The text in this file must be encoded in the value of
+      `alien-search/input-coding-system'.
+
+ 2nd: Path of a file in which the pattern, we want to quote meta
+      characters in it, is written.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/quote-meta/default-shell-script
+  "#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def escape_ruby_str_for_emacs! (str)
+  str.gsub!(/\\\\/) {'\\\\\\\\'}
+  str.gsub!(/\"/ ) {'\\\\\"'}
+end
+
+def main ()
+  fn_out, fn_pat = ARGV
+  
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  retval = Regexp.escape(str_pat);
+  escape_ruby_str_for_emacs!(retval)
+  
+  print '(setq result \"'
+  print retval
+  print '\")'
+
+  exit 0
+end
+
+main
+
+# EOF
+"
+  "A shell script which will be run as
+`alien-search/quote-meta/external-program'
+when it has nil value."
+  :type 'string
+  :group 'alien-search)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/quote-meta pattern) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/quote-meta (pattern)
+  "Quote meta characters in a PATTERN in manner of external program."
+  (interactive)
+  (alien-search/run-external-program
+   alien-search/quote-meta/external-program
+   alien-search/quote-meta/default-shell-script
+   nil ;; Don't care about text in current buffer.
+   pattern))
 
 ;;; alien-search.el ends here
