@@ -139,9 +139,9 @@
 ;; If you want to write these external programs by your choice
 ;; of language, see help documents of these variables:
 ;; 
-;;   `alien-search/replace/external-cmd'
-;;   `alien-search/occur/external-cmd'
-;;   `alien-search/isearch/external-cmd'
+;;   `alien-search/replace/external-program'
+;;   `alien-search/occur/external-program'
+;;   `alien-search/isearch/external-program'
 ;;
 ;; and set path to the programs to the variables when you wrote
 ;; them.
@@ -157,13 +157,13 @@
 ;; =========
 ;; - Toggle case (in)?sensitive search?
 ;;   or support `case-fold-search'?
-;; - Set extra options to external commands?
-;; - Better handling of exceptions from external commands,
+;; - Set extra options to external program?
+;; - Better handling of exceptions from external program,
 ;;   especially syntax error regarding to regular expression
 ;;   in isearch session.
 ;; - Better response?
 ;; - Write tests.
-;; - validate-regexp by external command?
+;; - validate-regexp by external program?
 
 ;;; Change Log:
 
@@ -215,16 +215,17 @@ contains texts passed from Emacs to external programs."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/search-by-external-cmd cmd default-shell-script pattern
-;;                                       &optional replacement)     => RESULT
+;;  (alien-search/search-by-external-program prog-path default-shell-script
+;;                                           pattern &optional replacement)
+;;                                                                   => RESULT
 ;; ----------------------------------------------------------------------------
-(defun alien-search/search-by-external-cmd (cmd default-shell-script pattern
+(defun alien-search/search-by-external-program (prog-path default-shell-script pattern
                                                 &optional replacement)
-  "Scan current buffer with external command to detect matching
+  "Scan current buffer with external program to detect matching
 texts by PATTERN.
 
 NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
-                      on each match by external command."
+                      on each match by external program."
   (let* ((base               (expand-file-name
                               alien-search/tmp-file-prefix
                               alien-search/tmp-dir))
@@ -232,9 +233,9 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
          (fn-out-pattern     (make-temp-name base))
          (fn-out-replacement (make-temp-name base))
          (fn-in-result       (make-temp-name base))
-         (fn-script          (make-temp-name base))
-         (cmd-basename       (if cmd
-                                 (file-name-nondirectory cmd)
+         (fn-program         (make-temp-name base))
+         (prog-basename      (if prog-path
+                                 (file-name-nondirectory prog-path)
                                "default-shell-script"))
          (proc-output-buf    (get-buffer-create " *alien-search*"))
          (cur-buf            (current-buffer))
@@ -245,8 +246,8 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
     (unwind-protect
         (progn
 
-          ;; Save informations, which have to be passed to 
-          ;; external command, to temporally files.
+          ;; Save information, which have to be passed to 
+          ;; external program, to temporally files.
           (unwind-protect 
               (progn
                 (set-default-file-modes #o0600)
@@ -265,18 +266,18 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
             (set-default-file-modes orig-file-modes))
 
           ;; Save default-shell-script to file when required.
-          (when (not cmd)
-            (with-temp-file fn-script
+          (when (not prog-path)
+            (with-temp-file fn-program
               (set-buffer-file-coding-system coding-sys-out)
               (insert default-shell-script))
-            (set-file-modes fn-script #o0700)
-            (setq cmd fn-script))
+            (set-file-modes fn-program #o0700)
+            (setq prog-path fn-program))
           
           ;;(message "[alien-search] Running...")
           
-          ;; Do search by external command.
+          ;; Do search by external program.
           (let ((status (apply #'call-process
-                               `(,cmd
+                               `(,prog-path
                                  nil ,(buffer-name proc-output-buf) nil
                                  ,fn-out-body
                                  ,fn-in-result
@@ -285,7 +286,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
             (when (not (and (numberp status)
                             (zerop status)))
               (error "[alien-search] %s exited with status \"%s\":\n%s"
-                     cmd-basename
+                     prog-basename
                      status
                      (with-current-buffer proc-output-buf
                        (buffer-substring (point-min) (point-max))))))
@@ -295,10 +296,10 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           (with-current-buffer proc-output-buf
             (when (/= (point-min) (point-max))
               (message "[alien-search] messages from %s:\n%s"
-                       cmd-basename
+                       prog-basename
                        (buffer-substring (point-min) (point-max)))))
           
-          ;; Parse result from external command.
+          ;; Parse result from external program.
           (let ((coding-system-for-read coding-sys-in))
             ;; Loaded data will be stored to the local variable `result'.
             (load (expand-file-name fn-in-result) nil t t))
@@ -309,27 +310,27 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
       (and (file-exists-p fn-out-replacement) (delete-file fn-out-replacement))
       (and (file-exists-p fn-out-body       ) (delete-file fn-out-body       ))
       (and (file-exists-p fn-in-result      ) (delete-file fn-in-result      ))
-      (and (file-exists-p fn-script         ) (delete-file fn-script         ))
+      (and (file-exists-p fn-program        ) (delete-file fn-program        ))
       (kill-buffer proc-output-buf))))
 
 
 ;;; ===========================================================================
 ;;;
-;;;  `query-replace' with a help from alien commands.
+;;;  `query-replace' with a help from external program.
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/replace/external-cmd nil
-  "Path of the command to use to execute actual search operation.
+(defcustom alien-search/replace/external-program nil
+  "Path of an external program to use to execute actual search operation.
 
-Four arguments describe below will be passed to the script.
+Four arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
       The text in this file is encoded in the value of
       `alien-search/output-coding-system'.
 
- 2nd: Path of a file to which the script should write the result
+ 2nd: Path of a file to which the program should write the result
       of current search operation.
 
       The form of the result should have a form like:
@@ -347,7 +348,7 @@ Four arguments describe below will be passed to the script.
       `alien-search/input-coding-system'.
 
  3rd: Path of a file in which the pattern we want to search is written.
-      The script have a responsibility to search this pattern
+      The program have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -355,7 +356,7 @@ Four arguments describe below will be passed to the script.
       `alien-search/output-coding-system'.
 
  4th: Path of a file in which the replacement expression is written.
-      The script have a responsibility to interpolate variables
+      The program have a responsibility to interpolate variables
       in the expression on each match, then write them to the file
       specified by 2nd argument.
 
@@ -417,8 +418,9 @@ main
 
 # EOF
 "
-  "A shell script which will be run as a command
-`alien-search/replace/external-cmd' when it has nil value."
+  "A shell script which will be run as 
+`alien-search/replace/external-program'
+when it has nil value."
   :type  'string
   :group 'alien-search)
 
@@ -440,7 +442,7 @@ See also `query-replace-defaults'.")
 ;;                              &optional delimited start end) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/query-replace (pattern replacement &optional delimited start end)
-  "Do `query-replace' with a help from alien command.
+  "Do `query-replace' with a help from external program.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
@@ -473,10 +475,11 @@ more information."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/replace/search-by-external-cmd pattern replacement) => LIST
+;;  (alien-search/replace/search-by-external-program pattern replacement)
+;;                                                                     => LIST
 ;; ----------------------------------------------------------------------------
-(defun alien-search/replace/search-by-external-cmd (pattern replacement min max)
-  "Scan current buffer with external command to detect matching
+(defun alien-search/replace/search-by-external-program (pattern replacement min max)
+  "Scan current buffer with external program to detect matching
 texts by PATTERN.
 
 Overlays will be made on each matched text, and they will be
@@ -489,8 +492,8 @@ alien-search/replace/replacement of each overlay.
 Returns position of the neighborhood overlay of a pointer in
 the list `alien-search/replace/ovs-on-match/data'."
   (let* ((offset (point-min))
-         (result (alien-search/search-by-external-cmd
-                  alien-search/replace/external-cmd
+         (result (alien-search/search-by-external-program
+                  alien-search/replace/external-program
                   alien-search/replace/default-shell-script
                   pattern
                   replacement)))
@@ -507,18 +510,18 @@ the list `alien-search/replace/ovs-on-match/data'."
 ;;  (alien-search/replace/parse-search-result result offset) => OVERLAYS
 ;; ----------------------------------------------------------------------------
 (defun alien-search/replace/parse-search-result (result offset min max)
-  "Subroutine of `alien-search/replace/search-by-external-cmd'."
+  "Subroutine of `alien-search/replace/search-by-external-program'."
   (alien-search/replace/ovs-on-match/dispose)
   ;; RESULT has structure like:
   ;;   ((MATCH_START MATCH_END "REPLACEMENT")
   ;;    ...)
   ;;
   ;; NOTE: Special variables in "REPLACEMENT"
-  ;;       should be expanded by alien command.
+  ;;       should be expanded by external program.
   (save-excursion
     (let ((data    nil)
           (cur-buf (current-buffer)))
-      ;;(message "[alien-search] Parsing search results from external command...")
+      ;;(message "[alien-search] Parsing search results from external program...")
       (dolist (lst result)
         (let* ((beg         (+ (nth 0 lst) offset))
                (end         (+ (nth 1 lst) offset))
@@ -526,7 +529,7 @@ the list `alien-search/replace/ovs-on-match/data'."
           (when (and (not (and min (< beg min)))
                      (not (and max (< max end))))
             (alien-search/replace/ovs-on-match/add beg end cur-buf replacement))))
-      ;;(message "[alien-search] Parsing search results from external command...done")
+      ;;(message "[alien-search] Parsing search results from external program...done")
       )))
 
 ;; ----------------------------------------------------------------------------
@@ -550,7 +553,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
   ;; Based on `perform-replace'.
 
   ;; XXX: The overlays `ovs-on-match', that looks like lazy-highlight,
-  ;;      should be updated by `alien-search/replace/search-by-external-cmd'
+  ;;      should be updated by `alien-search/replace/search-by-external-program'
   ;;      whenever the function `replace-match' is called, but it is little
   ;;      bit annoying so we don't update them so much often here.
   (or map (setq map query-replace-map))
@@ -594,11 +597,12 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
       (goto-char (setq min (min start end)))
       (deactivate-mark))
 
-    ;; Do search by external command and detect index of
+    ;; Do search by external program and detect index of
     ;; neighborhood overlay of a pointer.
-    (setq idx (alien-search/replace/search-by-external-cmd from-string
-                                                           real-replacement
-                                                           min max))
+    (setq idx (alien-search/replace/search-by-external-program
+               from-string
+               real-replacement
+               min max))
 
     (push-mark)
     (undo-boundary)
@@ -747,7 +751,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
                                  (recursive-edit)))
                              (goto-char opos)
                              (set-marker opos nil))
-                           (setq idx (alien-search/replace/search-by-external-cmd
+                           (setq idx (alien-search/replace/search-by-external-program
                                       from-string
                                       next-replacement
                                       min max))
@@ -770,7 +774,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
                                                 real-replacement))
                              (goto-char opos)
                              (set-marker opos nil))
-                           (setq idx (alien-search/replace/search-by-external-cmd
+                           (setq idx (alien-search/replace/search-by-external-program
                                       from-string
                                       real-replacement
                                       min max))
@@ -801,7 +805,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
 
                              (goto-char opos)
                              (set-marker opos nil))
-                           (setq idx (alien-search/replace/search-by-external-cmd
+                           (setq idx (alien-search/replace/search-by-external-program
                                       from-string
                                       real-replacement
                                       min max))
@@ -889,7 +893,7 @@ Put overlay on current match."
 
 ;;; ===========================================================================
 ;;;
-;;;  Overlays on all of matches by external command.
+;;;  Overlays on all of matches by external program.
 ;;;
 ;;; ===========================================================================
 
@@ -924,7 +928,7 @@ alien-search/replace/replacement."
 ;;  (alien-search/replace/ovs-on-match/dispose) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/replace/ovs-on-match/dispose ()
-  "Delete overlays on matched strings created by command
+  "Delete overlays on matched strings created by external program
 `alien-search/replace'."
   (dolist (ov alien-search/replace/ovs-on-match/data)
     (overlay-put ov 'alien-search/replace/replacement nil)
@@ -947,21 +951,22 @@ alien-search/replace/replacement."
 
 ;;; ===========================================================================
 ;;;
-;;;  `occur' with a help from alien commands.
+;;;  `occur' with a help from external program.
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/occur/external-cmd nil
-  "Path of the command to use to execute actual search operation.
+(defcustom alien-search/occur/external-program nil
+  "Path of an external program to use to execute actual search
+operation.
 
-Three arguments describe below will be passed to the script.
+Three arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
       The text in this file is encoded in the value of
       `alien-search/output-coding-system'.
 
- 2nd: Path of a file to which the script should write the result
+ 2nd: Path of a file to which the program should write the result
       of current search operation.
 
       The form of the result should have a form like:
@@ -987,7 +992,7 @@ Three arguments describe below will be passed to the script.
       `alien-search/input-coding-system'.
 
  3rd: Path of a file in which the pattern we want to search is written.
-      The script have a responsibility to search this pattern
+      The program have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -1045,8 +1050,9 @@ main
 
 # EOF
 "
-  "A shell script which will be run as a command
-`alien-search/occur/external-cmd' when it has nil value."
+  "A shell script which will be run as
+`alien-search/occur/external-program'
+when it has nil value."
   :type  'string
   :group 'alien-search)
 
@@ -1115,8 +1121,8 @@ main
                 (matches-in-line nil)
                 result)
             (with-current-buffer buf
-              (setq result (alien-search/search-by-external-cmd
-                            alien-search/occur/external-cmd
+              (setq result (alien-search/search-by-external-program
+                            alien-search/occur/external-program
                             alien-search/occur/default-shell-script
                             regexp))
               (or coding
@@ -1225,21 +1231,21 @@ main
   
 ;;; ===========================================================================
 ;;;
-;;;  `isearch' with a help from alien commands.
+;;;  `isearch' with a help from external program.
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/isearch/external-cmd nil
-  "Path of the command to use to execute actual search operation.
+(defcustom alien-search/isearch/external-program nil
+  "Path of an external program to use to execute actual search operation.
 
-Three arguments describe below will be passed to the script.
+Three arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
       The text in this file is encoded in the value of
       `alien-search/output-coding-system'.
 
- 2nd: Path of a file to which the script should write the result
+ 2nd: Path of a file to which the program should write the result
       of current search operation.
 
       The form of the result should have a form like:
@@ -1257,7 +1263,7 @@ Three arguments describe below will be passed to the script.
       `alien-search/input-coding-system'.
 
  3rd: Path of a file in which the pattern we want to search is written.
-      The script have a responsibility to search this pattern
+      The program have a responsibility to search this pattern
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -1303,8 +1309,9 @@ main
 
 # EOF
 "
-  "A shell script which will be run as a command
-`alien-search/isearch/external-cmd' when it has nil value."
+  "A shell script which will be run as
+`alien-search/isearch/external-program'
+when it has nil value."
   :type  'string
   :group 'alien-search)
 
@@ -1325,7 +1332,7 @@ main
 ;;  (alien-search/isearch-forward &optional not-regexp no-recursive-edit) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/isearch-forward (&optional not-regexp no-recursive-edit)
-  "Do isearch with a help from alien command.
+  "Do isearch with a help from external program.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
@@ -1348,7 +1355,7 @@ more information."
   (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
 
 (defun alien-search/isearch-backward (&optional not-regexp no-recursive-edit)
-  "Do isearch with a help from alien command.
+  "Do isearch with a help from external program.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
@@ -1419,7 +1426,7 @@ more information."
 ;; ----------------------------------------------------------------------------
 (defun alien-search/isearch/isearch-search-fun-function ()
   "The value used as value of `isearch-search-fun' while
-isearch by alien-search is on.
+isearch by alien-search is going on.
 
 This function returns the search function
 `alien-search/isearch/search-fun' for isearch to use."
@@ -1440,9 +1447,10 @@ and `re-search-backward' while isearch by alien-search is on."
                         regexp))
             (not alien-search/isearch/.cached-data))
     (setq alien-search/isearch/.cached-data
-          (alien-search/search-by-external-cmd alien-search/isearch/external-cmd
-                                               alien-search/isearch/default-shell-script
-                                               regexp))
+          (alien-search/search-by-external-program
+           alien-search/isearch/external-program
+           alien-search/isearch/default-shell-script
+           regexp))
     (setq alien-search/isearch/.last-regexp
           regexp))
   (let ((forward-p isearch-forward)
