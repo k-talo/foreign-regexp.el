@@ -230,7 +230,7 @@ contains texts passed from Emacs to external programs."
                                                     pattern
                                                     &optional
                                                     replacement)
-  "Run external program to execute oerations regarding to search.
+  "Run external program to execute operations regarding to search.
 
 NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                       on each match by external program."
