@@ -15,7 +15,7 @@ def main ()
   
   $stdout = open(fn_out, 'w:UTF-8')
   
-  retval = Regexp.escape(str_pat);
+  retval = Regexp.escape(str_pat)
   escape_ruby_str_for_emacs!(retval)
   
   print '(setq result "'

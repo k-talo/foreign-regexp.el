@@ -11,7 +11,7 @@ def main ()
   
   $stdout = open(fn_out, 'w:UTF-8')
   
-  print "(setq result '(";
+  print "(setq result '("
   
   str_in.scan( Regexp.new(str_pat) ) do
     print '('
@@ -20,8 +20,8 @@ def main ()
     print ')'
   end
   
-  print "))\n";
-  print ";;; EOF\n";
+  print "))\n"
+  print ";;; EOF\n"
   
   exit 0
 

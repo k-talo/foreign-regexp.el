@@ -16,7 +16,7 @@ def main ()
   open(fn_in, 'r:UTF-8') do |file_in|
     while line = file_in.gets do
       matched = 0
-      len = line.length;
+      len = line.length
       line.chomp!
       
       line.scan( Regexp.new(str_pat) ) do
@@ -25,7 +25,7 @@ def main ()
         print offset + Regexp.last_match.begin(0), ' '
         print offset + Regexp.last_match.end(0)
         print ')'
-        matched += 1;
+        matched += 1
       end
       print ')' if matched != 0
       
@@ -33,8 +33,8 @@ def main ()
     end
   end
   
-  print "))\n";
-  print ";;; EOF\n";
+  print "))\n"
+  print ";;; EOF\n"
   
   exit 0
   

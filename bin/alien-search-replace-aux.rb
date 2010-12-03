@@ -36,8 +36,8 @@ def main ()
     print ')'
   end
   
-  print "))\n";
-  print ";;; EOF\n";
+  print "))\n"
+  print ";;; EOF\n"
   
   exit 0
   
