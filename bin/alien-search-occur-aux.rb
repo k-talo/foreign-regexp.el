@@ -17,6 +17,7 @@ def main ()
     while line = file_in.gets do
       matched = 0
       len = line.length;
+      line.chomp!
       
       line.scan( Regexp.new(str_pat) ) do
         print '(' if matched == 0
