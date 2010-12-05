@@ -171,6 +171,7 @@
 ;; - Better response?
 ;; - Write tests.
 ;; - validate-regexp by external program?
+;; - Care about `reb-auto-match-limit' in re-builder?
 
 ;;; Change Log:
 
@@ -1596,4 +1597,357 @@ when it has nil value."
    nil ;; Don't care about text in current buffer.
    pattern))
 
+
+;;; ===========================================================================
+;;;
+;;;  `re-builder' with a help from external program.
+;;;
+;;; ===========================================================================
+(require 're-builder)
+
+(defcustom alien-search/re-builder/external-program "~/bin/alien-search-re-builder-aux.rb"
+  "Path of an external program to use to execute actual search operation.
+
+Three arguments describe below will be passed to the program.
+
+ 1st: Path of a file which contains the text to be searched.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'.
+
+ 2nd: Path of a file to which the program should write the result
+      of current search operation.
+
+      The external program have to output a form like:
+
+        (setq result
+              '((1st-MATCH-START 1st-MATCH-END
+                 SUB-MATCH-1-IN-1st-MATCH-START SUB-MATCH-1-IN-1st-MATCH-END
+                 SUB-MATCH-2-IN-1st-MATCH-START SUB-MATCH-2-IN-1st-MATCH-END
+                 ...)
+                (2nd-MATCH-START 2nd-MATCH-END)
+                 SUB-MATCH-1-IN-2nd-MATCH-START SUB-MATCH-1-IN-2nd-MATCH-END
+                 SUB-MATCH-2-IN-2nd-MATCH-START SUB-MATCH-2-IN-2nd-MATCH-END
+                 ...)
+                ...)
+
+      to this file.
+
+      Note that each start and end position in the form should be
+      an offset from beginning of the text which has been searched.
+      (This means each number should be started from 0, not from 1)
+
+      The text in this file must be encoded in the value of
+      `alien-search/input-coding-system'.
+
+ 3rd: Path of a file in which the pattern we want to search is written.
+      The program have a responsibility to search this pattern
+      from the file specified by 1st argument, then write start and
+      end positions of each match to the file specified by 2nd argument.
+
+      The text in this file is encoded in the value of
+      `alien-search/output-coding-system'."
+  :type  'string
+  :group 'alien-search)
+
+(defcustom alien-search/re-builder/default-shell-script
+  ""
+  "A shell script which will be run as
+`alien-search/re-builder/external-program'
+when it has nil value."
+  :type  'string
+  :group 'alien-search)
+
+(defvar alien-search/re-builder/.cached-data nil
+  "Private variable.")
+(defvar alien-search/re-builder/.last-regexp nil
+  "Private variable.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/with-overriding-re-search-fn (&keys re-search-forward-fn
+;;                                                    re-search-backward-fn
+;;                                                    when-regexp-eq)
+;;                                              &rest body) => RESULT FROM BODY
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/with-overriding-re-search-fn (args &rest body)
+  "Run BODY with alternating `re-search-forward' and
+`re-search-backward' with functions RE-SEARCH-FORWARD-FN
+and RE-SEARCH-BACKWARD-FN when the REGEXP, the first
+argument of `re-search-forward' and `re-search-backward',
+is `eq' to the string WHEN-REGEXP-EQ."
+  (declare (indent defun))
+  (let ((g-orig-re-search-forward-fn  (gensym))
+        (g-orig-re-search-backward-fn (gensym))
+        (g-re-search-forward-fn       (gensym))
+        (g-re-search-backward-fn      (gensym))
+        (g-when-regexp-eq             (gensym))
+        (g-args                       (gensym)))
+    `(let ((,g-orig-re-search-forward-fn  (symbol-function 're-search-forward))
+           (,g-orig-re-search-backward-fn (symbol-function 're-search-backward))
+           (,g-re-search-forward-fn  ,(or (cadr (memq :re-search-forward-fn args))
+                                          (error "No `:re-search-forward-fn'!")))
+           (,g-re-search-backward-fn ,(or (cadr (memq :re-search-backward-fn args))
+                                          (error "No `:re-search-backward-fn'!")))
+           (,g-when-regexp-eq        ,(or (cadr (memq :when-regexp-eq args))
+                                          (error "No `:when-regexp-eq'!"))))
+       (unwind-protect
+           (progn
+             (setf (symbol-function 're-search-forward)
+                   '(lambda (&rest ,g-args)
+                      (cond
+                       ((eq (car ,g-args)
+                            ,g-when-regexp-eq)
+                        (apply ,g-re-search-forward-fn ,g-args))
+                       (t
+                        (apply ,g-orig-re-search-forward-fn ,g-args)))))
+             (setf (symbol-function 're-search-backward)
+                   '(lambda (&rest ,g-args)
+                      (cond
+                       ((eq (car ,g-args)
+                            ,g-when-regexp-eq)
+                        (apply ,g-re-search-backward-fn ,g-args))
+                       (t
+                        (apply ,g-orig-re-search-backward-fn ,g-args)))))
+             ,@body)
+         (setf (symbol-function 're-search-forward)  ,g-orig-re-search-forward-fn)
+         (setf (symbol-function 're-search-backward) ,g-orig-re-search-backward-fn)))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+(defadvice re-builder (before alien-search/re-builder/re-builder ())
+  (setq alien-search/re-builder/.cached-data nil))
+(ad-activate 're-builder)
+
+(defadvice reb-next-match (around alien-search/re-builder/ext-match ())
+  (case reb-re-syntax
+    ((alien)
+     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :re-search-backward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :when-regexp-eq
+                                                 (with-current-buffer reb-target-buffer
+                                                   reb-regexp))
+       (let ((alien-search/re-builder/forward-p t))
+         ad-do-it)))
+    (t
+     ad-do-it)))
+(ad-activate 'reb-next-match)
+
+(defadvice reb-prev-match (around alien-search/re-builder/prev-match ())
+  (case reb-re-syntax
+    ((alien)
+     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :re-search-backward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :when-regexp-eq
+                                                 (with-current-buffer reb-target-buffer
+                                                   reb-regexp))
+       (let ((alien-search/re-builder/forward-p nil))
+         ad-do-it)))
+    (t
+     ad-do-it)))
+(ad-activate 'reb-prev-match)
+
+(defadvice reb-copy (around alien-search/re-builder/copy ())
+  (case reb-re-syntax
+   ((alien)
+    (kill-new (buffer-substring-no-properties (point-min) (point-max))))
+   (t ad-do-it)))
+(ad-activate 'reb-copy)
+
+(defadvice reb-change-syntax (around alien-search/re-builder/change-syntax (&optional syntax))
+  (interactive
+   (list (intern
+          (completing-read "Select syntax: "
+                           (mapcar (lambda (el) (cons (symbol-name el) 1))
+                                   (alien-search/re-builder/get-syntax-lst))
+                           nil t (symbol-name reb-re-syntax)))))
+  (if (memq syntax '(read string lisp-re sregex rx alien))
+      (let ((buffer (get-buffer reb-buffer)))
+	(setq reb-re-syntax syntax)
+	(when buffer
+          (with-current-buffer buffer
+            (reb-initialize-buffer))))
+    (error "Invalid syntax: %s"  syntax)))
+(ad-activate 'reb-change-syntax)
+
+(defadvice reb-read-regexp (around alien-search/re-builder/read-regexp ())
+  (case reb-re-syntax
+   ((alien)
+    (setq ad-return-value
+          (buffer-substring-no-properties (point-min) (point-max))))
+   (t ad-do-it)))
+(ad-activate 'reb-read-regexp)
+
+(defadvice reb-insert-regexp (around alien-search/re-builder/insert-regexp ())
+  (case reb-re-syntax
+   ((alien)
+    (when reb-regexp
+      (insert reb-regexp)))
+   (t ad-do-it)))
+(ad-activate 'reb-insert-regexp)
+
+(defadvice reb-count-subexps (around alien-search/re-builder/count-subexps (re))
+  (case reb-re-syntax
+   ((alien)
+    (let ((retval 0))
+      ;; Update `alien-search/re-builder/.cached-data'.
+      (alien-search/re-builder/search-fun (reb-target-binding reb-regexp) (point-max))
+      
+      (dolist (be-lst alien-search/re-builder/.cached-data)
+        (setq retval (max retval (1- (/ (length be-lst) 2)))))
+      (setq ad-return-value retval)))
+   (t ad-do-it)))
+(ad-activate 'reb-count-subexps)
+
+(defadvice reb-update-overlays (around alien-search/re-builder/update-overlays (&optional subexp))
+  (case reb-re-syntax
+    ((alien)
+     (setq alien-search/re-builder/.cached-data nil)
+     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :re-search-backward-fn
+                                                 'alien-search/re-builder/search-fun
+                                                 :when-regexp-eq
+                                                 (with-current-buffer reb-target-buffer
+                                                   reb-regexp))
+       ad-do-it))
+    (t
+     ad-do-it)))
+(ad-activate 'reb-update-overlays)
+
+       
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/get-syntax-lst) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/get-syntax-lst ()
+  "Returns list of syntax defined in `reb-re-syntax'."
+  ;; XXX: Ugly hack.
+  ;;      This won't work if `reb-re-syntax' has
+  ;;      structure other than default value.
+  (let ((type (get 'reb-re-syntax 'custom-type)))
+    (setq type (delete 'choice type))
+    (mapcar '(lambda (alt-type)
+               (cond
+                ((symbolp alt-type)
+                 alt-type)
+                ((listp alt-type)
+                 (let (retval)
+                   (while alt-type
+                     (case (car alt-type)
+                       ((const)
+                        (setq alt-type (cdr alt-type)))
+                       ((:tag)
+                        (setq alt-type (cddr alt-type)))
+                       (t
+                        (setq retval (car alt-type))
+                        (setq alt-type nil))))
+                   retval))))
+            type)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/search-fun regexp &optional bound noerror count)
+;;                                                                    => POINT
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/search-fun (regexp &optional bound noerror count)
+  "Search for the first occurrence of REGEXP in alien manner.
+If found, move point to the end of the occurrence,
+update the match data, and return point.
+
+This function will be used as alternate function of `re-search-forward'
+and `re-search-backward' by `re-builder'."
+  (when (or (not (equal alien-search/re-builder/.last-regexp
+                        regexp))
+            (not alien-search/re-builder/.cached-data))
+    (setq alien-search/re-builder/.cached-data
+          ;; Do not run external program when
+          ;; regexp is empty.
+          (if (and (stringp regexp)
+                   (not (equal regexp "")))
+              (alien-search/run-external-program
+               alien-search/re-builder/external-program
+               alien-search/re-builder/default-shell-script
+               (with-current-buffer reb-target-buffer
+                 (buffer-substring (point-min) (point-max)))
+               regexp)
+            nil))
+    (setq alien-search/re-builder/.last-regexp
+          regexp))
+  (let ((forward-p (if (boundp 'alien-search/re-builder/forward-p)
+                       alien-search/re-builder/forward-p
+                     t))
+        (pt (with-current-buffer reb-target-buffer
+              (point))))
+    (if forward-p
+        ;; Search forward
+        (let* ((data alien-search/re-builder/.cached-data)
+               (be-lst (car (member-if
+                             #'(lambda (be-lst)
+                                 (<= pt (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
+                             data)))
+               (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
+               (end (and be-lst (1+ (nth 1 be-lst))))) ;;1+ = [Offset => Count]
+          (when (and be-lst
+                     (if bound
+                         (<= end bound)
+                       t))
+            (set-match-data `(,beg
+                              ,end
+                              ;;1+ = [Offset => Count]
+                              ,@(mapcar #'1+ (cddr be-lst))))
+            (goto-char end)
+            end))
+      ;; Search backward
+      (let* ((data (reverse alien-search/re-builder/.cached-data))
+             (be-lst (car (member-if
+                           #'(lambda (be-lst)
+                               (<= (1+ (nth 1 be-lst)) pt)) ;;1+ = [Offset => Count]
+                           data)))
+             (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
+             (end (and be-lst (1+ (nth 1 be-lst))))) ;;1+ = [Offset => Count]
+        (when (and be-lst
+                   (if bound
+                       (<= bound beg)
+                     t))
+          (set-match-data `(,beg
+                            ,end
+                            ;;1+ = [Offset => Count]
+                            ,@(mapcar #'1+ (cddr be-lst))))
+          (goto-char beg)
+          beg)))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Main
+;;
+;; ----------------------------------------------------------------------------
+
+;; XXX: Ugly hack.
+;; Put `alien' to custom variable `reb-re-syntax'.
+(when (not (memq 'alien (alien-search/re-builder/get-syntax-lst)))
+  (put 'reb-re-syntax 'custom-type
+       (nconc (get 'reb-re-syntax 'custom-type)
+              '((const :tag "Alien syntax" alien)))))
+          
 ;;; alien-search.el ends here
