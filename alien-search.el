@@ -295,8 +295,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                                  ))))
             (when (not (and (numberp status)
                             (zerop status)))
-              (error "[alien-search] %s exited with status \"%s\":\n%s"
-                     prog-basename
+              (error "[alien-search] ERROR(%s): %s"
                      status
                      (with-current-buffer proc-output-buf
                        (buffer-substring (point-min) (point-max))))))
@@ -1465,12 +1464,15 @@ and `re-search-backward' while isearch by alien-search is on."
   (when (or (not (equal alien-search/isearch/.last-regexp
                         regexp))
             (not alien-search/isearch/.cached-data))
-    (setq alien-search/isearch/.cached-data
-          (alien-search/run-external-program
-           alien-search/isearch/external-program
-           alien-search/isearch/default-shell-script
-           (buffer-substring (point-min) (point-max))
-           regexp))
+    (condition-case c
+        (setq alien-search/isearch/.cached-data
+              (alien-search/run-external-program
+               alien-search/isearch/external-program
+               alien-search/isearch/default-shell-script
+               (buffer-substring (point-min) (point-max))
+               regexp))
+      (signal 'invalid-regexp
+              (cdr c)))
     (setq alien-search/isearch/.last-regexp
           regexp))
   (let ((forward-p isearch-forward)
