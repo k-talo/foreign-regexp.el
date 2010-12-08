@@ -186,7 +186,7 @@
 
 ;;; ===========================================================================
 ;;;
-;;;  Common variable and functions to alien-search operation.
+;;;  Common variable and functions to each `alien-search' operation.
 ;;;
 ;;; ===========================================================================
 
@@ -214,6 +214,12 @@ contains texts passed from Emacs to external programs."
 
 (defvar alien-search/history  nil
   "History list for some commands that runs alien-search.")
+
+(defvar alien-search/use-extended-regex-p nil)
+(make-variable-buffer-local 'alien-search/use-extended-regex-p)
+
+(defvar alien-search/dot-match-a-newline-p nil)
+(make-variable-buffer-local 'alien-search/dot-match-a-newline-p)
 
 
 ;; ----------------------------------------------------------------------------
@@ -322,20 +328,6 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
       (and (file-exists-p fn-in-result      ) (delete-file fn-in-result      ))
       (and (file-exists-p fn-program        ) (delete-file fn-program        ))
       (kill-buffer proc-output-buf))))
-
-
-;;; ===========================================================================
-;;;
-;;;  Common variable and functions to each alien-search operation.
-;;;
-;;; ===========================================================================
-
-(defvar alien-search/use-extended-regex-p nil)
-(make-variable-buffer-local 'alien-search/use-extended-regex-p)
-
-(defvar alien-search/dot-match-a-newline-p nil)
-(make-variable-buffer-local 'alien-search/dot-match-a-newline-p)
-
 
 
 ;;; ===========================================================================
