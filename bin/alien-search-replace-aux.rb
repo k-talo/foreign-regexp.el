@@ -3,7 +3,7 @@
 
 abort "Ruby version is too old (1.9 or later is required)." if RUBY_VERSION < "1.9"
 
-def escape_str_to_eval! (str)
+def escape_str_for_eval! (str)
   str.gsub!(/"/ ){'\\"'}
 end
 
@@ -13,19 +13,23 @@ def escape_ruby_str_for_emacs! (str)
 end
 
 def main ()
-  fn_in, fn_out, fn_pat, fn_rpl = ARGV
+  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p = ARGV
   
   str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
   str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
   str_rpl = open(fn_rpl, 'r:UTF-8') {|f| f.read}
   
-  escape_str_to_eval!(str_rpl)
+  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
+                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
+                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
+  
+  escape_str_for_eval!(str_rpl)
   
   $stdout = open(fn_out, 'w:UTF-8')
   
   print "(setq result '("
   
-  str_in.scan( Regexp.new(str_pat) ) do |m|
+  str_in.scan( pat ) do |m|
     replacement = eval '"' + str_rpl + '"'
     escape_ruby_str_for_emacs!(replacement)
     

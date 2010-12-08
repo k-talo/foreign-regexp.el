@@ -54,6 +54,9 @@ sub main () {
     my $fn_out    = shift @ARGV or die "No output file name!";
     my $fn_pat    = shift @ARGV or die "No pattern file name!";
     my $fn_repl   = shift @ARGV or die "No replacement file name!";
+    my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
+    my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
+    my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";;
     my $code      = 'utf8';
     
     my($str_in, $str_pat, $str_repl);
@@ -65,6 +68,11 @@ sub main () {
         $str_pat  = FileHandle->new($fn_pat,  "<:encoding($code)")->getline;
         $str_repl = FileHandle->new($fn_repl, "<:encoding($code)")->getline;
     }
+    my $pat = eval("qr/${str_pat}/om" .
+                   ($dot_p  ? "s" : "") .
+                   ($case_p ? "i" : "") .
+                   ($ext_p  ? "x" : ""));
+    
     escape_str_to_eval(\$str_repl);
     my $build_replacement_fn = generate_build_replacement_fn($str_repl);
     die "Error in replacement \"${str_repl}\":\n${EVAL_ERROR}" if $EVAL_ERROR;

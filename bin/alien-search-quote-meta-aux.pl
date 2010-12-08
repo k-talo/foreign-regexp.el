@@ -6,7 +6,7 @@ use 5.008;
 use Encode;
 use utf8;
 
-use English;
+use English qw( -no_match_vars );
 use FileHandle;
 
 sub escape_perl_str_for_emacs {

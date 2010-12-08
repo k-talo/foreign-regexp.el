@@ -13,6 +13,9 @@ sub main () {
     my $fn_in     = shift @ARGV or die "No input  file name!";
     my $fn_out    = shift @ARGV or die "No output file name!";
     my $fn_pat    = shift @ARGV or die "No pattern file name!";
+    my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
+    my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
+    my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";;
     my $code      = 'utf8';
     my $offset    = 0;
     
@@ -26,6 +29,10 @@ sub main () {
         $str_pat  = FileHandle->new($fn_pat, "<:encoding($code)")->getline;
     }
     
+    my $pat = eval("qr/${str_pat}/om" .
+                   ($dot_p  ? "s" : "") .
+                   ($case_p ? "i" : "") .
+                   ($ext_p  ? "x" : ""));
     {
         local $INPUT_RECORD_SEPARATOR = "\n";
         my $fh_in  = FileHandle->new($fn_in, "<:encoding($code)");
@@ -39,7 +46,7 @@ sub main () {
             chomp $line;
             
             
-            while ($line =~ m/${str_pat}/g) {
+            while ($line =~ m/${pat}/g) {
                 print $fh_out '(' unless $matched++;
                 print($fh_out
                       '(',
