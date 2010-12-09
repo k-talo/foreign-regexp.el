@@ -1228,8 +1228,8 @@ when it has nil value."
                                               (setq matches-in-line
                                                     (cdr matches-in-line))))
                       (add-text-properties
-                       (- (1+ (nth 0 match-pair)) begpt) ;;1+ = [Offset => Count]
-                       (- (1+ (nth 1 match-pair)) begpt) ;;1+ = [Offset => Count]
+                       (+ begpt (nth 0 match-pair)) ;; [Count + Offset => Count]
+                       (+ begpt (nth 1 match-pair)) ;; [Count + Offset => Count]
                        (append
                         `(occur-match t)
                         (when match-face
