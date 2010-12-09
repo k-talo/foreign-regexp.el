@@ -1533,16 +1533,23 @@ and `re-search-backward' while isearch by alien-search is on."
                         regexp))
             (not alien-search/isearch/.cached-data))
     (condition-case c
-        (setq alien-search/isearch/.cached-data
-              (alien-search/run-external-program
-               alien-search/isearch/external-program
-               alien-search/isearch/default-shell-script
-               (buffer-substring (point-min) (point-max))
-               regexp
-               nil
-               (if alien-search/dot-match-a-newline-p "DOT" "")
-               (if isearch-case-fold-search "" "CASE")
-               (if alien-search/use-extended-regex-p "EXT" "")))
+        (let ((pt-min (point-min))
+              (pt-max (point-max)))
+          (setq alien-search/isearch/.cached-data
+                (alien-search/run-external-program
+                 alien-search/isearch/external-program
+                 alien-search/isearch/default-shell-script
+                 (buffer-substring pt-min pt-max)
+                 regexp
+                 nil
+                 (if alien-search/dot-match-a-newline-p "DOT" "")
+                 (if isearch-case-fold-search "" "CASE")
+                 (if alien-search/use-extended-regex-p "EXT" "")))
+          (dolist (be-lst alien-search/isearch/.cached-data)
+            (setf (nth 0 be-lst)
+                  (+ pt-min (nth 0 be-lst))) ;; [Count + Offset => Count]
+            (setf (nth 1 be-lst)
+                  (+ pt-min (nth 1 be-lst))))) ;; [Count + Offset => Count]
       (error
        (signal 'invalid-regexp
                (cdr c))))
@@ -1555,10 +1562,10 @@ and `re-search-backward' while isearch by alien-search is on."
         (let* ((data alien-search/isearch/.cached-data)
                (be-lst (car (member-if
                              #'(lambda (be-lst)
-                                 (<= pt (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
+                                 (<= pt (nth 0 be-lst)))
                              data)))
-               (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
-               (end (and be-lst (1+ (nth 1 be-lst))))) ;;1+ = [Offset => Count]
+               (beg (and be-lst (nth 0 be-lst)))
+               (end (and be-lst (nth 1 be-lst))))
           (when (and be-lst
                      (if bound
                          (<= end bound)
@@ -1570,10 +1577,10 @@ and `re-search-backward' while isearch by alien-search is on."
       (let* ((data (reverse alien-search/isearch/.cached-data))
              (be-lst (car (member-if
                            #'(lambda (be-lst)
-                               (<= (1+ (nth 1 be-lst)) pt)) ;;1+ = [Offset => Count]
+                               (<= (nth 1 be-lst) pt))
                            data)))
-             (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
-             (end (and be-lst (1+ (nth 1 be-lst)))))
+             (beg (and be-lst (nth 0 be-lst)))
+             (end (and be-lst (nth 1 be-lst))))
         (when (and be-lst
                    (if bound
                        (<= bound beg)
