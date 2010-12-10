@@ -15,7 +15,7 @@ sub main () {
     my $fn_pat    = shift @ARGV or die "No pattern file name!";
     my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
     my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
-    my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";;
+    my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";
     my $limit     = @ARGV ? shift(@ARGV) : die "No search limit.";
     my $code      = 'utf8';
     
