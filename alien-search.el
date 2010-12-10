@@ -215,12 +215,90 @@ contains texts passed from Emacs to external programs."
 (defvar alien-search/history  nil
   "History list for some commands that runs alien-search.")
 
-(defvar alien-search/use-extended-regex-p nil)
-(make-variable-buffer-local 'alien-search/use-extended-regex-p)
-
+;; Search options.
+;;
 (defvar alien-search/dot-match-a-newline-p nil)
 (make-variable-buffer-local 'alien-search/dot-match-a-newline-p)
 
+(defvar alien-search/use-extended-regex-p nil)
+(make-variable-buffer-local 'alien-search/use-extended-regex-p)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Hooks
+;;
+;; ----------------------------------------------------------------------------
+(defvar alien-search/case-fold-search-will-change-hook nil
+  "Normal hook run before toggle `case-fold-search'.")
+
+(defvar alien-search/use-extended-regex-p-will-change-hook nil
+  "Normal hook run before toggle `use-extended-regex-p'.")
+
+(defvar alien-search/dot-match-a-newline-p-will-change-hook nil
+  "Normal hook run before toggle `dot-match-a-newline-p'.")
+
+(defvar alien-search/case-fold-search-changed-hook nil
+  "Normal hook run after toggle `case-fold-search'.")
+
+(defvar alien-search/use-extended-regex-p-changed-hook nil
+  "Normal hook run after toggle `use-extended-regex-p'.")
+
+(defvar alien-search/dot-match-a-newline-p-changed-hook nil
+  "Normal hook run after toggle `dot-match-a-newline-p'.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/toggle-case-fold-search &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/toggle-case-fold-search (&optional no-message)
+  "Toggle `case-fold-search'."
+  (interactive)
+  
+  (run-hooks 'alien-search/case-fold-search-will-change-hook)
+  (setq case-fold-search
+        (not case-fold-search))
+  (run-hooks 'alien-search/case-fold-search-changed-hook)
+  
+  (when (not no-message)
+    (minibuffer-message "[alien-search] case %ssensitive"
+                        (if case-fold-search "in" ""))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/toggle-dot-match-a-newline-p &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/toggle-dot-match-a-newline-p (&optional no-message)
+  "Toggle `alien-search/dot-match-a-newline-p'."
+  (interactive)
+  (run-hooks 'alien-search/dot-match-a-newline-p-will-change-hook)
+  (setq alien-search/dot-match-a-newline-p
+        (not alien-search/dot-match-a-newline-p))
+  (run-hooks 'alien-search/dot-match-a-newline-p-changed-hook)
+  
+  (when (not no-message)
+    (minibuffer-message "[alien-search] . %s newline"
+                        (if alien-search/dot-match-a-newline-p "matches" "does not match"))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/toggle-use-extended-regex-p &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/toggle-use-extended-regex-p (&optional no-message)
+  "Toggle `alien-search/use-extended-regex-p'."
+  (interactive)
+  (run-hooks 'alien-search/use-extended-regex-p-will-change-hook)
+  (setq alien-search/use-extended-regex-p
+        (not alien-search/use-extended-regex-p))
+  (run-hooks 'alien-search/use-extended-regex-p-changed-hook)
+  
+  (when (not no-message)
+    (minibuffer-message "[alien-search] %sextended regex"
+                        (if alien-search/use-extended-regex-p "" "no "))))
 
 ;; ----------------------------------------------------------------------------
 ;;
