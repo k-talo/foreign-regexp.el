@@ -2185,5 +2185,107 @@ and `re-search-backward' by `re-builder'."
   (put 'reb-re-syntax 'custom-type
        (nconc (get 'reb-re-syntax 'custom-type)
               '((const :tag "Alien syntax" alien)))))
-          
+
+
+;;; ===========================================================================
+;;;
+;;;  Non-incremental search with a help from external program.
+;;;
+;;; ===========================================================================
+
+(defvar alien-search/non-incremental/.last-regexp nil
+  "Private variable.")
+
+(defvar alien-search/non-incremental/.cached-data nil
+  "Private variable.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+
+;; From menu-bar.el
+(defun alien-search/non-incremental/search-forward (string)
+  "Read a regular expression and search for it nonincrementally."
+  (interactive (list (read-from-minibuffer "Search for alien regexp: "
+                                           nil nil nil
+                                           'alien-search/history)))
+  (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
+        (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
+        (isearch-forward t))
+    (alien-search/isearch/search-fun string)
+    (setq menu-bar-last-search-type 'alien)
+    
+    (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
+    (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
+    (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+(put 'alien-search/non-incremental/search-forward  'alien-search/nonincremental-command-p t)
+
+;; From menu-bar.el
+(defun alien-search/non-incremental/search-backward (string)
+  "Read a regular expression and search for it backward nonincrementally."
+  (interactive (list (read-from-minibuffer "Search for alien regexp: "
+                                           nil nil nil
+                                           'alien-search/history)))
+  (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
+        (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
+        (isearch-forward nil))
+    (alien-search/isearch/search-fun string)
+    (setq menu-bar-last-search-type 'alien)
+    
+    (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
+    (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
+    (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+(put 'alien-search/non-incremental/search-backward 'alien-search/nonincremental-command-p t)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+(when (require 'menu-bar nil t)
+  (when (fboundp 'nonincremental-repeat-search-forward)
+    (defadvice nonincremental-repeat-search-forward (around alien-search/nonincremental-repeat-search-forward ())
+      (cond
+       ((and (eq menu-bar-last-search-type 'alien)
+             alien-search/history)
+        (setq ad-return-valur
+              (alien-search/non-incremental/search-forward (car alien-search/history))))
+       (t
+        ad-do-it)))
+    (ad-activate 'nonincremental-repeat-search-forward)
+    (put 'nonincremental-repeat-search-forward 'alien-search/nonincremental-command-p t))
+
+  (when (fboundp 'nonincremental-repeat-search-backward)
+    (defadvice nonincremental-repeat-search-backward (around alien-search/nonincremental-repeat-search-backward ())
+      (cond
+       ((and (eq menu-bar-last-search-type 'alien)
+             alien-search/history)
+        (setq ad-return-valur
+              (alien-search/non-incremental/search-backward (car alien-search/history))))
+       (t
+        ad-do-it)))
+    (ad-activate 'nonincremental-repeat-search-backward)
+    (put 'nonincremental-repeat-search-backward 'alien-search/nonincremental-command-p t)))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/non-incremental/.clear-cache) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/non-incremental/.clear-cache ()
+  "Private function."
+  (when (not (get this-command 'alien-search/nonincremental-command-p))
+    (setq alien-search/non-incremental/.cached-data nil)
+    (remove-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+
 ;;; alien-search.el ends here
