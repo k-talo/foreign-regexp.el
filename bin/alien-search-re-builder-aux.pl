@@ -16,6 +16,7 @@ sub main () {
     my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
     my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
     my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";;
+    my $limit     = @ARGV ? shift(@ARGV) : die "No search limit.";
     my $code      = 'utf8';
     
     umask 0177;
@@ -39,7 +40,8 @@ sub main () {
         
         print $fh_out "(setq result '(";
         
-        while ($str_in =~ m/${pat}/omg) {
+        my $i = 0;
+        while (((!$limit) || (++$i <= $limit)) && ($str_in =~ m/${pat}/omg)) {
             print $fh_out ' (';
 
             foreach my $i (0 .. $#LAST_MATCH_START) {

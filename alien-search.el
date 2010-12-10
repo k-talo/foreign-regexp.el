@@ -171,7 +171,6 @@
 ;; - Better response?
 ;; - Write tests.
 ;; - validate-regexp by external program?
-;; - Care about `reb-auto-match-limit' in re-builder?
 
 ;;; Change Log:
 
@@ -1730,7 +1729,10 @@ Three arguments describe below will be passed to the program.
       end positions of each match to the file specified by 2nd argument.
 
       The text in this file is encoded in the value of
-      `alien-search/output-coding-system'."
+      `alien-search/output-coding-system'.
+
+ 6th: Positive integer when we want limit the matches, or empty
+      string when we don't want limit the matches."
   :type  'string
   :group 'alien-search)
 
@@ -1741,7 +1743,7 @@ Three arguments describe below will be passed to the program.
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
 
 def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p = ARGV
+  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p, limit = ARGV
   
   str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
   str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
@@ -1754,7 +1756,12 @@ def main ()
   
   print \"(setq result '(\"
   
+  limit = (Integer limit rescue nil)
+  count = 0
+  
   str_in.scan( pat ) do
+    break unless (!limit || ((count += 1) <= limit))
+    
     print '('
     Regexp.last_match.length.times {|i|
       print Regexp.last_match.begin(i), ' '
@@ -2019,11 +2026,14 @@ and `re-search-backward' by `re-builder'."
                      nil
                      (if alien-search/dot-match-a-newline-p "DOT" "")
                      (if case-fold-search "" "CASE")
-                     (if alien-search/use-extended-regex-p "EXT" "")))
+                     (if alien-search/use-extended-regex-p "EXT" "")
+                     (if (numberp reb-auto-match-limit)
+                         (format "%s" reb-auto-match-limit)
+                       "")))
                 (error
                  ;; It seems that re-builder throws away error messages,
                  ;; so we leave error messages on *Messages* buffer.
-                 (message "%s" (cadr c))
+                 (message "%s" c)
                  (error c)))
             nil))
     (setq alien-search/re-builder/.last-regexp
