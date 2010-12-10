@@ -1201,7 +1201,8 @@ when it has nil value."
                 (goto-char (point-min)) ;; begin searching in the buffer
                 (while (setq matches-in-line (prog1 (car result)
                                                (setq result (cdr result))))
-                  (let* ((matchbeg (1+ (caar matches-in-line))) ;;1+ = [Offset => Count]
+                  (let* ((pt-min   (point-min))
+                         (matchbeg (+ pt-min (caar matches-in-line))) ;; [Count + Offset => Count]
                          (lines    (progn (goto-char matchbeg)
                                           (line-number-at-pos)))
                          (marker   (point-marker))
@@ -1228,8 +1229,8 @@ when it has nil value."
                                               (setq matches-in-line
                                                     (cdr matches-in-line))))
                       (add-text-properties
-                       (+ begpt (nth 0 match-pair)) ;; [Count + Offset => Count]
-                       (+ begpt (nth 1 match-pair)) ;; [Count + Offset => Count]
+                       (- (+ pt-min (nth 0 match-pair)) begpt) ;; [Count + Offset => Count]
+                       (- (+ pt-min (nth 1 match-pair)) begpt) ;; [Count + Offset => Count]
                        (append
                         `(occur-match t)
                         (when match-face
