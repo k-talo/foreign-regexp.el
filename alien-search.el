@@ -338,7 +338,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 (defcustom alien-search/replace/external-program nil
   "Path of an external program to use to execute actual search operation.
 
-Four arguments describe below will be passed to the program.
+Seven arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
@@ -1000,7 +1000,7 @@ alien-search/replace/replacement."
   "Path of an external program to use to execute actual search
 operation.
 
-Three arguments describe below will be passed to the program.
+Six arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
@@ -1305,7 +1305,7 @@ when it has nil value."
 (defcustom alien-search/isearch/external-program nil
   "Path of an external program to use to execute actual search operation.
 
-Three arguments describe below will be passed to the program.
+Six arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
@@ -1691,7 +1691,7 @@ when it has nil value."
 (defcustom alien-search/re-builder/external-program nil
   "Path of an external program to use to execute actual search operation.
 
-Three arguments describe below will be passed to the program.
+Seven arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
@@ -1731,7 +1731,20 @@ Three arguments describe below will be passed to the program.
       The text in this file is encoded in the value of
       `alien-search/output-coding-system'.
 
- 6th: Positive integer when we want limit the matches, or empty
+ 4th: A dot matches newline flag.
+      When the value of this flag is not empty string,
+      . should be matched to a newline character.
+
+ 5th: A case sensitive flag.
+      When the value of this flag is not empty string,
+      the match operation should be done case-sensitive.
+
+ 6th: An extended regular expression flag.
+      When the value of this flag is not empty string,
+      the current search pattern(:see 3rd arg) should be
+      interpreted as extended regular expression.
+
+ 7th: Positive integer when we want limit the matches, or empty
       string when we don't want limit the matches."
   :type  'string
   :group 'alien-search)
