@@ -2143,6 +2143,54 @@ is `eq' to the string WHEN-REGEXP-EQ."
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/toggle-case-fold-search-on-target-buffer
+;;                                               &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/toggle-case-fold-search-on-target-buffer (&optional no-message)
+  "Toggle `case-fold-search' on `reb-target-buffer'."
+  (interactive)
+  (cond
+   (reb-target-buffer
+    (with-current-buffer reb-target-buffer
+      (alien-search/toggle-case-fold-search no-message)))
+   (t
+    (error "[alien-search] No `reb-target-buffer'."))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/toggle-dot-match-a-newline-p-on-target-buffer
+;;                                               &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/toggle-dot-match-a-newline-p-on-target-buffer (&optional no-message)
+  "Toggle `alien-search/dot-match-a-newline-p' on `reb-target-buffer'."
+  (interactive)
+  (cond
+   (reb-target-buffer
+    (with-current-buffer reb-target-buffer
+      (alien-search/toggle-dot-match-a-newline-p no-message)))
+   (t
+    (error "[alien-search] No `reb-target-buffer'."))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/toggle-use-extended-regex-p-on-target-buffer
+;;                                               &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/toggle-use-extended-regex-p-on-target-buffer (&optional no-message)
+  "Toggle `alien-search/use-extended-regex-p' on `reb-target-buffer'."
+  (interactive)
+  (cond
+   (reb-target-buffer
+    (with-current-buffer reb-target-buffer
+      (alien-search/toggle-use-extended-regex-p no-message)))
+   (t
+    (error "[alien-search] No `reb-target-buffer'."))))
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Advices
 ;;
 ;; ----------------------------------------------------------------------------
@@ -2205,6 +2253,23 @@ is `eq' to the string WHEN-REGEXP-EQ."
             (reb-initialize-buffer))))
     (error "Invalid syntax: %s"  syntax)))
 (ad-activate 'reb-change-syntax)
+
+(defadvice reb-update-modestring (around alien-search/re-builder/update-mode-string ())
+  "Put search option indicator on modeline."
+  (case reb-re-syntax
+   ((alien)
+    (setq reb-mode-string
+          (concat
+           (if reb-subexp-mode
+               (format " (subexp %s)" (or reb-subexp-displayed "-"))
+             "")
+           " "
+           (with-current-buffer reb-target-buffer
+             (alien-search/search-option-indicator/make-indicator))))
+    (force-mode-line-update))
+   (t
+    ad-do-it)))
+(ad-activate 'reb-update-modestring)
 
 (defadvice reb-read-regexp (around alien-search/re-builder/read-regexp ())
   (case reb-re-syntax
@@ -2370,7 +2435,48 @@ and `re-search-backward' by `re-builder'."
           (goto-char beg)
           beg)))))
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/reb-target-buffer-p buf) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/reb-target-buffer-p (buf)
+  "Test if BUF is `reb-target-buffer' and if `reb-re-syntax' is
+'alien or not."
+  (and (eq reb-re-syntax 'alien)
+       (get-buffer reb-buffer)
+       reb-target-buffer
+       (eq reb-target-buffer
+           buf)))
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/search-option-change-hook-fn) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/search-option-change-hook-fn ()
+  "Update mode string and update search status with external program.
+Called when search option of `reb-target-buffer' is changed."
+  (let ((cur-buf (current-buffer)))
+    (when (alien-search/re-builder/reb-target-buffer-p cur-buf)
+      (with-current-buffer cur-buf
+        (reb-update-modestring))
+      (with-current-buffer (get-buffer reb-buffer)
+        (reb-auto-update nil nil nil t)))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/setup-search-option-change-hook) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/setup-search-option-change-hook ()
+  "Set call back function `alien-search/re-builder/search-option-change-hook-fn'
+to each search option changed hook."
+  (when reb-target-buffer
+    (with-current-buffer reb-target-buffer
+      (add-hook 'alien-search/case-fold-search-changed-hook
+                'alien-search/re-builder/search-option-change-hook-fn)
+      
+      (add-hook 'alien-search/dot-match-a-newline-p-changed-hook
+                'alien-search/re-builder/search-option-change-hook-fn)
+      
+      (add-hook 'alien-search/use-extended-regex-p-changed-hook
+                'alien-search/re-builder/search-option-change-hook-fn))))
+    
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Main
@@ -2384,6 +2490,8 @@ and `re-search-backward' by `re-builder'."
        (nconc (get 'reb-re-syntax 'custom-type)
               '((const :tag "Alien syntax" alien)))))
 
+(add-hook 'reb-mode-hook
+          'alien-search/re-builder/setup-search-option-change-hook)
 
 ;;; ===========================================================================
 ;;;
