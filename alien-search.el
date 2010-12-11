@@ -605,6 +605,108 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 
 ;;; ===========================================================================
 ;;;
+;;;  Menus
+;;;
+;;; ===========================================================================
+
+(defvar alien-search/menu/use-menu-p t
+  "A flag if menu items for alien search will be installed or not.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/menu/install) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/menu/install ()
+  "Install menu items for alien search."
+  (easy-menu-add-item menu-bar-search-menu
+                      nil
+                      ["Alien Regexp Forward..." alien-search/non-incremental/search-forward
+                       :help "Search forward for an alien regular expression"]
+                      "separator-repeat-search")
+  (easy-menu-add-item menu-bar-search-menu
+                      nil
+                      ["Alien Regexp Backward..." alien-search/non-incremental/search-backward
+                       :help "Search backward for an alien regular expression"]
+                      "separator-repeat-search")
+                    
+  (easy-menu-add-item menu-bar-i-search-menu
+                      nil
+                      ["Forward Alien Regexp..." alien-search/isearch-forward
+                       :help "Search forward for an alien regular expression as you type it"]
+                      nil)
+
+  (easy-menu-add-item menu-bar-i-search-menu
+                      nil
+                      ["Backward Alien Regexp..." alien-search/isearch-backward
+                       :help "Search backwards for an alien regular expression as you type it"]
+                      "separator-repeat-search")
+
+  (easy-menu-add-item menu-bar-replace-menu
+                      nil
+                      ["Replace Alien Regexp..." alien-search/query-replace
+                       :help "Replace alien regular expression interactively, ask about each occurrence"]
+                      "separator-replace-tags")
+
+  (easy-menu-add-item menu-bar-edit-menu
+                      nil
+                      '("Alien Search Options"
+                        ["Case Insensitive" alien-search/toggle-case-fold-search
+                         :style radio :selected (not case-fold-search)]
+                        ["Make . Match a Newline" alien-search/toggle-dot-match-a-newline-p
+                         :style radio :selected alien-search/dot-match-a-newline-p]
+                        ["Use Extended Regular Expression" alien-search/toggle-use-extended-regex-p
+                         :style radio :selected alien-search/use-extended-regex-p])
+                      "goto")
+
+  ;; XXX: Should be removed?
+  (easy-menu-add-item menu-bar-edit-menu
+                      nil
+                      '("---")
+                      "goto")
+
+
+  ;; Override defalut menu items.
+  ;;
+  (define-key menu-bar-search-menu [repeat-search-fwd]
+    `(menu-item ,(purecopy "Repeat Forward") nonincremental-repeat-search-forward
+                :enable (or (and (eq menu-bar-last-search-type 'string)
+                                        search-ring)
+                                   (and (eq menu-bar-last-search-type 'regexp)
+                                        regexp-search-ring)
+                                   ;; For alien regexp search.
+                                   (and (eq menu-bar-last-search-type 'alien)
+                                        alien-search/history))
+                :help ,(purecopy "Repeat last search forward")))
+  (define-key menu-bar-search-menu [repeat-search-back]
+    `(menu-item ,(purecopy "Repeat Backwards") nonincremental-repeat-search-backward
+                :enable (or (and (eq menu-bar-last-search-type 'string)
+                                        search-ring)
+                                   (and (eq menu-bar-last-search-type 'regexp)
+                                        regexp-search-ring)
+                                   ;; For alien regexp search.
+                                   (and (eq menu-bar-last-search-type 'alien)
+                                        alien-search/history))
+                :help ,(purecopy "Repeat last search backwards"))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Main
+;;
+;; ----------------------------------------------------------------------------
+
+(when alien-search/menu/use-menu-p
+  (alien-search/menu/install))
+
+
+;;; ===========================================================================
+;;;
 ;;;  `query-replace' with a help from external program.
 ;;;
 ;;; ===========================================================================
