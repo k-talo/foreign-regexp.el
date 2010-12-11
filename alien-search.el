@@ -369,6 +369,8 @@ commands `alien-search/toggle-case-fold',
   (run-hooks 'alien-search/case-fold-will-change-hook)
   (setq case-fold-search
         (not case-fold-search))
+  (when isearch-mode
+    (setq isearch-case-fold-search case-fold-search))
   (run-hooks 'alien-search/case-fold-changed-hook)
   
   (when (not no-message)
@@ -590,11 +592,16 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                       (t alien-search/search-option-indicator/separator-str))
                      elm))
           (list ""
-                (if (or (and isearch-mode
-                             isearch-case-fold-search)
-                        case-fold-search)
-                    alien-search/search-option-indicator/case-fold-str
+                (cond
+                 ((and isearch-mode
+                       isearch-case-fold-search)
+                  alien-search/search-option-indicator/case-fold-str)
+                 (isearch-mode
                   alien-search/search-option-indicator/no-case-fold-str)
+                 (case-fold-search
+                  alien-search/search-option-indicator/case-fold-str)
+                 (t 
+                  alien-search/search-option-indicator/no-case-fold-str))
                 (if alien-search/dot-match-a-newline-p
                     alien-search/search-option-indicator/dot-match-str
                   alien-search/search-option-indicator/no-dot-match-str)
