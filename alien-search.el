@@ -1885,6 +1885,37 @@ more information."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
+;;  (alien-search/isearch/search-option-changed-hook-fn) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/isearch/search-option-changed-hook-fn ()
+  "Update display when search option is changed."
+  (when isearch-mode
+    (setq isearch-success t isearch-adjusted t)
+    (setq alien-search/isearch/.cached-data nil)
+    
+    ;; Force run `isearch-lazy-highlight-new-loop'.
+    (setq isearch-lazy-highlight-last-string nil)
+    (isearch-update)
+    
+    ;; Suppress messages.
+    (setq no-message t)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/isearch/setup-search-option-changed-hook) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/isearch/setup-search-option-changed-hook ()
+  "Set call back function `alien-search/isearch/search-option-changed-hook-fn'
+to each search option changed hook."
+  (add-hook 'alien-search/case-fold-changed-hook
+            'alien-search/isearch/search-option-changed-hook-fn)
+
+  (add-hook 'alien-search/dot-match-changed-hook
+            'alien-search/isearch/search-option-changed-hook-fn)
+
+  (add-hook 'alien-search/ext-regexp-changed-hook
+            'alien-search/isearch/search-option-changed-hook-fn))
+
+;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/.isearch-mode-end-hook-fn ) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/isearch/.isearch-mode-end-hook-fn ()
@@ -1983,6 +2014,15 @@ and `re-search-backward' while isearch by alien-search is on."
           (set-match-data (list beg end))
           (goto-char beg)
           beg)))))
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Main
+;;
+;; ----------------------------------------------------------------------------
+
+(add-hook 'isearch-mode-hook
+          'alien-search/isearch/setup-search-option-changed-hook)
 
 
 ;;; ===========================================================================
