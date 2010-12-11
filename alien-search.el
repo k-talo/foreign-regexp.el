@@ -162,9 +162,6 @@
 ;;
 ;; WISH LIST
 ;; =========
-;; - Toggle case (in)?sensitive search?
-;;   or support `case-fold-search'?
-;; - Set extra options to external program?
 ;; - Better handling of exceptions from external program,
 ;;   especially syntax error regarding to regular expression
 ;;   in isearch session.
@@ -246,6 +243,115 @@ contains texts passed from Emacs to external programs."
 (defvar alien-search/dot-match-a-newline-p-changed-hook nil
   "Normal hook run after toggle `dot-match-a-newline-p'.")
 
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/with-search-option-indicator-on-minibuf-prompt &rest body)
+;;                                                           => RESULT OF BODY
+;; ----------------------------------------------------------------------------
+(defmacro* alien-search/alambda (parms &body body)
+  (declare (indent 1))
+  `(labels ((self ,parms ,@body))
+     #'self))
+(defmacro alien-search/with-search-option-indicator-on-minibuf-prompt (&rest body)
+  "Run `read-from-minibuffer' with displaying search option indicator
+on prompt string.
+
+Search option indicator will be updated whenever options are changed via
+commands `alien-search/toggle-case-fold-search',
+`alien-search/toggle-dot-match-a-newline-p' and
+`alien-search/toggle-use-extended-regex-p'."
+  (let* ((g-orig-read-from-minibuffer-fn (gensym))
+         (hook-togglefn-lst '((alien-search/case-fold-search-will-change-hook
+                               alien-search/toggle-case-fold-search)
+                              (alien-search/use-extended-regex-p-will-change-hook
+                               alien-search/toggle-use-extended-regex-p)
+                              (alien-search/dot-match-a-newline-p-will-change-hook
+                               alien-search/toggle-dot-match-a-newline-p))))
+    `(lexical-let ((,g-orig-read-from-minibuffer-fn (symbol-function 'read-from-minibuffer)))
+       (flet ((signal-option-changed
+               ()
+               (save-excursion
+                 ;; Current buffer must be a *Minibuf-N*.
+                 (when (minibufferp (current-buffer))
+                   ;; Preserve current input string and cursor
+                   ;; position to restart `read-from-minibuffer'.
+                   (let* ((cur-pt (point))
+                          (eol-pt (progn
+                                    (end-of-line)
+                                    (point)))
+                          (bol-pt (progn
+                                    (beginning-of-line)
+                                    (point)))
+                          (offset (1+ (- cur-pt bol-pt))))
+                     (setq deactivate-mark nil)
+                     (throw 'alien-search/util/.option-changed
+                            (cons (buffer-substring bol-pt eol-pt)
+                                  offset)))))))
+         (unwind-protect
+             (progn
+               (setf (symbol-function 'read-from-minibuffer)
+                     (lambda (prompt &optional initial-contents keymap read
+                                     hist defalut-value inherit-input-method)
+                       ;; Preserve current alien-search/*-will-change-hooks.
+                       (let (,@(mapcar (lambda (lst)
+                                         (let ((will-hook (car lst)))
+                                           `(,will-hook ,will-hook)))
+                                       hook-togglefn-lst)
+                             (initial-contents initial-contents)
+                             hook-fn-alst
+                             retval)
+                         ;; Do not call this `read-from-minibuffer' recursively.
+                         (setf (symbol-function 'read-from-minibuffer)
+                               ,g-orig-read-from-minibuffer-fn)
+
+                         (lexical-let ((cur-buf (current-buffer)))
+                           ;; Do not toggle search options of *Minibuf-N* while reading
+                           ;; regexps, toggle re-options of CURRENT BUFFER instead.
+                           ,@(mapcar (lambda (lst)
+                                       (let ((will-hook (car lst))
+                                             (toggle-fn (cadr lst)))
+                                         `(add-hook
+                                           (quote ,will-hook)
+                                           (alien-search/alambda ()
+                                             (with-current-buffer cur-buf
+                                               (let ((,will-hook ,will-hook)) ;Preserve
+                                                 ;; Do not call this hook recursively.
+                                                 (remove-hook (quote ,will-hook)
+                                                              #'self)
+                                                 (,toggle-fn t)))
+                                             (signal-option-changed)))))
+                                     hook-togglefn-lst)
+                           ;; Whenever search option is changed,
+                           ;; restart `read-from-minibuffer' to
+                           ;; redisplay prompt.
+                           (while (setq initial-contents
+                                        (catch 'alien-search/util/.option-changed
+                                          (setq retval
+                                                (funcall
+                                                 ,g-orig-read-from-minibuffer-fn
+                                                 ;; Put lighter before ": " of prompt.
+                                                 (concat (substring prompt
+                                                                    0
+                                                                    (string-match ": $" prompt))
+                                                         (alien-search/search-option-indicator/make-indicator)
+                                                         ": ")
+                                                 initial-contents
+                                                 keymap
+                                                 read
+                                                 hist
+                                                 defalut-value
+                                                 inherit-input-method))
+                                          nil)))
+                           retval))))
+               ,@body)
+           (setf (symbol-function 'read-from-minibuffer)
+                 ,g-orig-read-from-minibuffer-fn))))))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -409,6 +515,96 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 
 ;;; ===========================================================================
 ;;;
+;;;  Search option indicator
+;;;
+;;; ===========================================================================
+
+(defcustom alien-search/search-option-indicator/case-fold-search-str ""
+  "A string displayed when the search option
+`case-fold-search' is on."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/no-case-fold-search-str "Case"
+  "A string displayed when the search option
+`case-fold-search' is off."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/dot-match-a-newline-str ".=~\\n"
+  "A string displayed when the search option
+`alien-search/dot-match-a-newline-p' is on."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/no-dot-match-a-newline-str ""
+  "A string displayed when the search option
+`alien-search/dot-match-a-newline-p' is off."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/use-extended-regex-str "Ext"
+  "A string displayed when the search option
+`alien-search/use-extended-regex-p' is on."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/no-use-extended-regex-str ""
+  "A string displayed when the search option
+`alien-search/use-extended-regex-p' is off."
+  :type 'string
+  :group 'alien-search)
+
+(defcustom alien-search/search-option-indicator/separator-str " "
+  "A string displayed between search option strings."
+  :type 'string
+  :group 'alien-search)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search-option-indicator/make-indicator) => STRING
+;; ----------------------------------------------------------------------------
+(defun alien-search/search-option-indicator/make-indicator ()
+  "Make a string which shows current search option status."
+  (let ((indicator (alien-search/search-option-indicator/make-indicator-aux)))
+    (if (not (zerop (length indicator)))
+        (concat "[" indicator "]")
+      "")))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search-option-indicator/make-indicator-aux) => STRING
+;; ----------------------------------------------------------------------------
+(defun alien-search/search-option-indicator/make-indicator-aux ()
+  "Auxiliary function of `alien-search/search-option-indicator/make-indicator'."
+  (reduce '(lambda (str elm)
+             (concat str
+                     (cond
+                      ((zerop (length str)) "")
+                      ((zerop (length elm)) "")
+                      (t alien-search/search-option-indicator/separator-str))
+                     elm))
+          (list ""
+                (if (or (and isearch-mode
+                             isearch-case-fold-search)
+                        case-fold-search)
+                    alien-search/search-option-indicator/case-fold-search-str
+                  alien-search/search-option-indicator/no-case-fold-search-str)
+                (if alien-search/dot-match-a-newline-p
+                    alien-search/search-option-indicator/dot-match-a-newline-str
+                  alien-search/search-option-indicator/no-dot-match-a-newline-str)
+                (if alien-search/use-extended-regex-p
+                    alien-search/search-option-indicator/use-extended-regex-str 
+                  alien-search/search-option-indicator/no-use-extended-regex-str))))
+
+
+;;; ===========================================================================
+;;;
 ;;;  `query-replace' with a help from external program.
 ;;;
 ;;; ===========================================================================
@@ -563,10 +759,11 @@ more information."
           (let ((query-replace-from-history-variable 'alien-search/history)
                 (query-replace-to-history-variable   'alien-search/history)
                 (query-replace-defaults              alien-search/replace/defaults))
-            (prog1 (query-replace-read-args
-                    (concat "Query replace alien regexp"
-                            (if (and transient-mark-mode mark-active) " in region" ""))
-                    t)
+            (prog1 (alien-search/with-search-option-indicator-on-minibuf-prompt
+                    (query-replace-read-args
+                     (concat "Query replace alien regexp"
+                             (if (and transient-mark-mode mark-active) " in region" ""))
+                     t))
               (setq alien-search/replace/defaults query-replace-defaults)))))
      (list (nth 0 common) (nth 1 common) (nth 2 common)
            ;; These are done separately here
@@ -1208,7 +1405,8 @@ when it has nil value."
 (defun alien-search/occur (regexp &optional nlines)
   (interactive (let ((regexp-history alien-search/history))
                  (prog1
-                     (alien-search/occur-read-primary-args)
+                     (alien-search/with-search-option-indicator-on-minibuf-prompt
+                      (alien-search/occur-read-primary-args))
                    (setq alien-search/history regexp-history))))
   (let ((orig-occur-engine-fn (symbol-function 'occur-engine)))
     (setf (symbol-function 'occur-engine)
