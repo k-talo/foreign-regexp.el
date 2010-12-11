@@ -2607,9 +2607,9 @@ and `re-search-backward' by `re-builder'."
            buf)))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/search-option-change-hook-fn) => VOID
+;;  (alien-search/re-builder/search-option-changed-hook-fn) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/search-option-change-hook-fn ()
+(defun alien-search/re-builder/search-option-changed-hook-fn ()
   "Update mode string and update search status with external program.
 Called when search option of `reb-target-buffer' is changed."
   (let ((cur-buf (current-buffer)))
@@ -2620,21 +2620,21 @@ Called when search option of `reb-target-buffer' is changed."
         (reb-auto-update nil nil nil t)))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/setup-search-option-change-hook) => VOID
+;;  (alien-search/re-builder/setup-search-option-changed-hook) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/setup-search-option-change-hook ()
-  "Set call back function `alien-search/re-builder/search-option-change-hook-fn'
+(defun alien-search/re-builder/setup-search-option-changed-hook ()
+  "Set call back function `alien-search/re-builder/search-option-changed-hook-fn'
 to each search option changed hook."
   (when reb-target-buffer
     (with-current-buffer reb-target-buffer
       (add-hook 'alien-search/case-fold-changed-hook
-                'alien-search/re-builder/search-option-change-hook-fn)
+                'alien-search/re-builder/search-option-changed-hook-fn)
       
       (add-hook 'alien-search/dot-match-changed-hook
-                'alien-search/re-builder/search-option-change-hook-fn)
+                'alien-search/re-builder/search-option-changed-hook-fn)
       
       (add-hook 'alien-search/ext-regexp-changed-hook
-                'alien-search/re-builder/search-option-change-hook-fn))))
+                'alien-search/re-builder/search-option-changed-hook-fn))))
     
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2650,7 +2650,8 @@ to each search option changed hook."
               '((const :tag "Alien syntax" alien)))))
 
 (add-hook 'reb-mode-hook
-          'alien-search/re-builder/setup-search-option-change-hook)
+          'alien-search/re-builder/setup-search-option-changed-hook)
+
 
 ;;; ===========================================================================
 ;;;
