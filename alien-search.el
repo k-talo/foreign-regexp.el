@@ -2524,33 +2524,41 @@ and `re-search-backward' by `re-builder'."
   (when (or (not (equal alien-search/re-builder/.last-regexp
                         regexp))
             (not alien-search/re-builder/.cached-data))
-    (setq alien-search/re-builder/.cached-data
-          ;; Do not run external program when
-          ;; regexp is empty.
-          (if (and (stringp regexp)
-                   (not (equal regexp "")))
-              (condition-case c
-                  (with-current-buffer reb-target-buffer
-                    (alien-search/run-external-program
-                     alien-search/re-builder/external-program
-                     alien-search/re-builder/default-shell-script
-                     (buffer-substring (point-min) (point-max))
-                     regexp
-                     nil
-                     (if alien-search/dot-match-a-newline-p "DOT" "")
-                     (if case-fold-search "" "CASE")
-                     (if alien-search/use-extended-regexp-p "EXT" "")
-                     (if (numberp reb-auto-match-limit)
-                         (format "%s" reb-auto-match-limit)
-                       "")))
-                (error
-                 ;; It seems that re-builder throws away error messages,
-                 ;; so we leave error messages on *Messages* buffer.
-                 (message "%s" c)
-                 (error c)))
-            nil))
-    (setq alien-search/re-builder/.last-regexp
-          regexp))
+    (let ((pt-min (with-current-buffer reb-target-buffer (point-min)))
+          (pt-max (with-current-buffer reb-target-buffer (point-max))))
+      (setq alien-search/re-builder/.cached-data
+            ;; Do not run external program when
+            ;; regexp is empty.
+            (if (and (stringp regexp)
+                     (not (equal regexp "")))
+                (condition-case c
+                    (with-current-buffer reb-target-buffer
+                      (alien-search/run-external-program
+                       alien-search/re-builder/external-program
+                       alien-search/re-builder/default-shell-script
+                       (buffer-substring pt-min pt-max)
+                       regexp
+                       nil
+                       (if alien-search/dot-match-a-newline-p "DOT" "")
+                       (if case-fold-search "" "CASE")
+                       (if alien-search/use-extended-regexp-p "EXT" "")
+                       (if (numberp reb-auto-match-limit)
+                           (format "%s" reb-auto-match-limit)
+                         "")))
+                  (error
+                   ;; It seems that re-builder throws away error messages,
+                   ;; so we leave error messages on *Messages* buffer.
+                   (message "%s" c)
+                   (error c)))
+              nil))
+      
+      (dolist (be-lst alien-search/re-builder/.cached-data)
+        (dotimes (i (length be-lst))
+          (setf (nth i be-lst)
+              (+ pt-min (nth i be-lst))))) ;; [Count + Offset => Count]
+    
+      (setq alien-search/re-builder/.last-regexp
+            regexp)))
   (let ((forward-p (if (boundp 'alien-search/re-builder/forward-p)
                        alien-search/re-builder/forward-p
                      t))
@@ -2561,36 +2569,34 @@ and `re-search-backward' by `re-builder'."
         (let* ((data alien-search/re-builder/.cached-data)
                (be-lst (car (member-if
                              #'(lambda (be-lst)
-                                 (<= pt (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
+                                 (<= pt (nth 0 be-lst)))
                              data)))
-               (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
-               (end (and be-lst (1+ (nth 1 be-lst))))) ;;1+ = [Offset => Count]
+               (beg (and be-lst (nth 0 be-lst)))
+               (end (and be-lst (nth 1 be-lst))))
           (when (and be-lst
                      (if bound
                          (<= end bound)
                        t))
             (set-match-data `(,beg
                               ,end
-                              ;;1+ = [Offset => Count]
-                              ,@(mapcar #'1+ (cddr be-lst))))
+                              ,@(cddr be-lst)))
             (goto-char end)
             end))
       ;; Search backward
       (let* ((data (reverse alien-search/re-builder/.cached-data))
              (be-lst (car (member-if
                            #'(lambda (be-lst)
-                               (<= (1+ (nth 1 be-lst)) pt)) ;;1+ = [Offset => Count]
+                               (<= (nth 1 be-lst) pt))
                            data)))
-             (beg (and be-lst (1+ (nth 0 be-lst)))) ;;1+ = [Offset => Count]
-             (end (and be-lst (1+ (nth 1 be-lst))))) ;;1+ = [Offset => Count]
+             (beg (and be-lst (nth 0 be-lst)))
+             (end (and be-lst (nth 1 be-lst))))
         (when (and be-lst
                    (if bound
                        (<= bound beg)
                      t))
           (set-match-data `(,beg
                             ,end
-                            ;;1+ = [Offset => Count]
-                            ,@(mapcar #'1+ (cddr be-lst))))
+                            ,@(cddr be-lst)))
           (goto-char beg)
           beg)))))
 
