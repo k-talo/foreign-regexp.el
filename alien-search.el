@@ -225,22 +225,22 @@ contains texts passed from Emacs to external programs."
 ;;  Hooks
 ;;
 ;; ----------------------------------------------------------------------------
-(defvar alien-search/case-fold-search-will-change-hook nil
+(defvar alien-search/case-fold-will-change-hook nil
   "Normal hook run before toggle `case-fold-search'.")
 
-(defvar alien-search/use-extended-regex-p-will-change-hook nil
+(defvar alien-search/ext-regexp-will-change-hook nil
   "Normal hook run before toggle `use-extended-regex-p'.")
 
-(defvar alien-search/dot-match-a-newline-p-will-change-hook nil
+(defvar alien-search/dot-match-will-change-hook nil
   "Normal hook run before toggle `dot-match-a-newline-p'.")
 
-(defvar alien-search/case-fold-search-changed-hook nil
+(defvar alien-search/case-fold-changed-hook nil
   "Normal hook run after toggle `case-fold-search'.")
 
-(defvar alien-search/use-extended-regex-p-changed-hook nil
+(defvar alien-search/ext-regexp-changed-hook nil
   "Normal hook run after toggle `use-extended-regex-p'.")
 
-(defvar alien-search/dot-match-a-newline-p-changed-hook nil
+(defvar alien-search/dot-match-changed-hook nil
   "Normal hook run after toggle `dot-match-a-newline-p'.")
 
 
@@ -263,16 +263,16 @@ contains texts passed from Emacs to external programs."
 on prompt string.
 
 Search option indicator will be updated whenever options are changed via
-commands `alien-search/toggle-case-fold-search',
-`alien-search/toggle-dot-match-a-newline-p' and
-`alien-search/toggle-use-extended-regex-p'."
+commands `alien-search/toggle-case-fold',
+`alien-search/toggle-dot-match' and
+`alien-search/toggle-ext-regexp'."
   (let* ((g-orig-read-from-minibuffer-fn (gensym))
-         (hook-togglefn-lst '((alien-search/case-fold-search-will-change-hook
-                               alien-search/toggle-case-fold-search)
-                              (alien-search/use-extended-regex-p-will-change-hook
-                               alien-search/toggle-use-extended-regex-p)
-                              (alien-search/dot-match-a-newline-p-will-change-hook
-                               alien-search/toggle-dot-match-a-newline-p))))
+         (hook-togglefn-lst '((alien-search/case-fold-will-change-hook
+                               alien-search/toggle-case-fold)
+                              (alien-search/ext-regexp-will-change-hook
+                               alien-search/toggle-ext-regexp)
+                              (alien-search/dot-match-will-change-hook
+                               alien-search/toggle-dot-match))))
     `(lexical-let ((,g-orig-read-from-minibuffer-fn (symbol-function 'read-from-minibuffer)))
        (flet ((signal-option-changed
                ()
@@ -360,46 +360,46 @@ commands `alien-search/toggle-case-fold-search',
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/toggle-case-fold-search &optional no-message) => VOID
+;;  (alien-search/toggle-case-fold &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/toggle-case-fold-search (&optional no-message)
+(defun alien-search/toggle-case-fold (&optional no-message)
   "Toggle `case-fold-search'."
   (interactive)
   
-  (run-hooks 'alien-search/case-fold-search-will-change-hook)
+  (run-hooks 'alien-search/case-fold-will-change-hook)
   (setq case-fold-search
         (not case-fold-search))
-  (run-hooks 'alien-search/case-fold-search-changed-hook)
+  (run-hooks 'alien-search/case-fold-changed-hook)
   
   (when (not no-message)
     (minibuffer-message "[alien-search] case %ssensitive"
                         (if case-fold-search "in" ""))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/toggle-dot-match-a-newline-p &optional no-message) => VOID
+;;  (alien-search/toggle-dot-match &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/toggle-dot-match-a-newline-p (&optional no-message)
+(defun alien-search/toggle-dot-match (&optional no-message)
   "Toggle `alien-search/dot-match-a-newline-p'."
   (interactive)
-  (run-hooks 'alien-search/dot-match-a-newline-p-will-change-hook)
+  (run-hooks 'alien-search/dot-match-will-change-hook)
   (setq alien-search/dot-match-a-newline-p
         (not alien-search/dot-match-a-newline-p))
-  (run-hooks 'alien-search/dot-match-a-newline-p-changed-hook)
+  (run-hooks 'alien-search/dot-match-changed-hook)
   
   (when (not no-message)
     (minibuffer-message "[alien-search] . %s newline"
                         (if alien-search/dot-match-a-newline-p "matches" "does not match"))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/toggle-use-extended-regex-p &optional no-message) => VOID
+;;  (alien-search/toggle-ext-regexp &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/toggle-use-extended-regex-p (&optional no-message)
+(defun alien-search/toggle-ext-regexp (&optional no-message)
   "Toggle `alien-search/use-extended-regex-p'."
   (interactive)
-  (run-hooks 'alien-search/use-extended-regex-p-will-change-hook)
+  (run-hooks 'alien-search/ext-regexp-will-change-hook)
   (setq alien-search/use-extended-regex-p
         (not alien-search/use-extended-regex-p))
-  (run-hooks 'alien-search/use-extended-regex-p-changed-hook)
+  (run-hooks 'alien-search/ext-regexp-changed-hook)
   
   (when (not no-message)
     (minibuffer-message "[alien-search] %sextended regex"
@@ -519,37 +519,37 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/search-option-indicator/case-fold-search-str ""
+(defcustom alien-search/search-option-indicator/case-fold-str ""
   "A string displayed when the search option
 `case-fold-search' is on."
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/search-option-indicator/no-case-fold-search-str "Case"
+(defcustom alien-search/search-option-indicator/no-case-fold-str "Case"
   "A string displayed when the search option
 `case-fold-search' is off."
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/search-option-indicator/dot-match-a-newline-str ".=~\\n"
+(defcustom alien-search/search-option-indicator/dot-match-str ".=~\\n"
   "A string displayed when the search option
 `alien-search/dot-match-a-newline-p' is on."
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/search-option-indicator/no-dot-match-a-newline-str ""
+(defcustom alien-search/search-option-indicator/no-dot-match-str ""
   "A string displayed when the search option
 `alien-search/dot-match-a-newline-p' is off."
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/search-option-indicator/use-extended-regex-str "Ext"
+(defcustom alien-search/search-option-indicator/ext-regexp-str "Ext"
   "A string displayed when the search option
 `alien-search/use-extended-regex-p' is on."
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/search-option-indicator/no-use-extended-regex-str ""
+(defcustom alien-search/search-option-indicator/no-ext-regex-str ""
   "A string displayed when the search option
 `alien-search/use-extended-regex-p' is off."
   :type 'string
@@ -593,14 +593,14 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                 (if (or (and isearch-mode
                              isearch-case-fold-search)
                         case-fold-search)
-                    alien-search/search-option-indicator/case-fold-search-str
-                  alien-search/search-option-indicator/no-case-fold-search-str)
+                    alien-search/search-option-indicator/case-fold-str
+                  alien-search/search-option-indicator/no-case-fold-str)
                 (if alien-search/dot-match-a-newline-p
-                    alien-search/search-option-indicator/dot-match-a-newline-str
-                  alien-search/search-option-indicator/no-dot-match-a-newline-str)
+                    alien-search/search-option-indicator/dot-match-str
+                  alien-search/search-option-indicator/no-dot-match-str)
                 (if alien-search/use-extended-regex-p
-                    alien-search/search-option-indicator/use-extended-regex-str 
-                  alien-search/search-option-indicator/no-use-extended-regex-str))))
+                    alien-search/search-option-indicator/ext-regexp-str 
+                  alien-search/search-option-indicator/no-ext-regex-str))))
 
 
 ;;; ===========================================================================
@@ -656,11 +656,11 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
   (easy-menu-add-item menu-bar-edit-menu
                       nil
                       '("Alien Search Options"
-                        ["Case Insensitive" alien-search/toggle-case-fold-search
+                        ["Case Insensitive" alien-search/toggle-case-fold
                          :style radio :selected (not case-fold-search)]
-                        ["Make . Match a Newline" alien-search/toggle-dot-match-a-newline-p
+                        ["Make . Match a Newline" alien-search/toggle-dot-match
                          :style radio :selected alien-search/dot-match-a-newline-p]
-                        ["Use Extended Regular Expression" alien-search/toggle-use-extended-regex-p
+                        ["Use Extended Regular Expression" alien-search/toggle-ext-regexp
                          :style radio :selected alien-search/use-extended-regex-p])
                       "goto")
 
@@ -949,8 +949,9 @@ the list `alien-search/replace/ovs-on-match/data'."
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/perform-replace (from-string replacement
-;;                                     query-flag ignore ignore
-;;                                     &optional ignore map start end) => VOID
+;;                                         query-flag ignore ignore
+;;                                         &optional ignore map start end)
+;;                                                                     => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/replace/perform-replace (from-string replacement
                                                          query-flag
@@ -1793,7 +1794,8 @@ when it has nil value."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/isearch-forward &optional not-regexp no-recursive-edit) => VOID
+;;  (alien-search/isearch-forward &optional not-regexp no-recursive-edit)
+;;                                                                     => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/isearch-forward (&optional not-regexp no-recursive-edit)
   "Do isearch with a help from external program.
@@ -2202,9 +2204,9 @@ when it has nil value."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/with-overriding-re-search-fn (&keys re-search-forward-fn
-;;                                                    re-search-backward-fn
-;;                                                    when-regexp-eq)
+;;  (alien-search/with-overriding-re-search-fn ((&keys re-search-forward-fn
+;;                                                     re-search-backward-fn
+;;                                                     when-regexp-eq)
 ;;                                              &rest body) => RESULT FROM BODY
 ;; ----------------------------------------------------------------------------
 (defmacro alien-search/with-overriding-re-search-fn (args &rest body)
@@ -2258,44 +2260,44 @@ is `eq' to the string WHEN-REGEXP-EQ."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/toggle-case-fold-search-on-target-buffer
+;;  (alien-search/re-builder/toggle-case-fold-on-target-buffer
 ;;                                               &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/toggle-case-fold-search-on-target-buffer (&optional no-message)
+(defun alien-search/re-builder/toggle-case-fold-on-target-buffer (&optional no-message)
   "Toggle `case-fold-search' on `reb-target-buffer'."
   (interactive)
   (cond
    (reb-target-buffer
     (with-current-buffer reb-target-buffer
-      (alien-search/toggle-case-fold-search no-message)))
+      (alien-search/toggle-case-fold no-message)))
    (t
     (error "[alien-search] No `reb-target-buffer'."))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/toggle-dot-match-a-newline-p-on-target-buffer
+;;  (alien-search/re-builder/toggle-dot-match-on-target-buffer
 ;;                                               &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/toggle-dot-match-a-newline-p-on-target-buffer (&optional no-message)
+(defun alien-search/re-builder/toggle-dot-match-on-target-buffer (&optional no-message)
   "Toggle `alien-search/dot-match-a-newline-p' on `reb-target-buffer'."
   (interactive)
   (cond
    (reb-target-buffer
     (with-current-buffer reb-target-buffer
-      (alien-search/toggle-dot-match-a-newline-p no-message)))
+      (alien-search/toggle-dot-match no-message)))
    (t
     (error "[alien-search] No `reb-target-buffer'."))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/toggle-use-extended-regex-p-on-target-buffer
+;;  (alien-search/re-builder/toggle-ext-regexp-on-target-buffer
 ;;                                               &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/toggle-use-extended-regex-p-on-target-buffer (&optional no-message)
+(defun alien-search/re-builder/toggle-ext-regexp-on-target-buffer (&optional no-message)
   "Toggle `alien-search/use-extended-regex-p' on `reb-target-buffer'."
   (interactive)
   (cond
    (reb-target-buffer
     (with-current-buffer reb-target-buffer
-      (alien-search/toggle-use-extended-regex-p no-message)))
+      (alien-search/toggle-ext-regexp no-message)))
    (t
     (error "[alien-search] No `reb-target-buffer'."))))
 
@@ -2578,13 +2580,13 @@ Called when search option of `reb-target-buffer' is changed."
 to each search option changed hook."
   (when reb-target-buffer
     (with-current-buffer reb-target-buffer
-      (add-hook 'alien-search/case-fold-search-changed-hook
+      (add-hook 'alien-search/case-fold-changed-hook
                 'alien-search/re-builder/search-option-change-hook-fn)
       
-      (add-hook 'alien-search/dot-match-a-newline-p-changed-hook
+      (add-hook 'alien-search/dot-match-changed-hook
                 'alien-search/re-builder/search-option-change-hook-fn)
       
-      (add-hook 'alien-search/use-extended-regex-p-changed-hook
+      (add-hook 'alien-search/ext-regexp-changed-hook
                 'alien-search/re-builder/search-option-change-hook-fn))))
     
 ;; ----------------------------------------------------------------------------
