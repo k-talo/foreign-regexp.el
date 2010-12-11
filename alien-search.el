@@ -216,8 +216,8 @@ contains texts passed from Emacs to external programs."
 (defvar alien-search/dot-match-a-newline-p nil)
 (make-variable-buffer-local 'alien-search/dot-match-a-newline-p)
 
-(defvar alien-search/use-extended-regex-p nil)
-(make-variable-buffer-local 'alien-search/use-extended-regex-p)
+(defvar alien-search/use-extended-regexp-p nil)
+(make-variable-buffer-local 'alien-search/use-extended-regexp-p)
 
 
 ;; ----------------------------------------------------------------------------
@@ -229,19 +229,19 @@ contains texts passed from Emacs to external programs."
   "Normal hook run before toggle `case-fold-search'.")
 
 (defvar alien-search/ext-regexp-will-change-hook nil
-  "Normal hook run before toggle `use-extended-regex-p'.")
+  "Normal hook run before toggle `alien-search/use-extended-regexp-p'.")
 
 (defvar alien-search/dot-match-will-change-hook nil
-  "Normal hook run before toggle `dot-match-a-newline-p'.")
+  "Normal hook run before toggle `alien-search/dot-match-a-newline-p'.")
 
 (defvar alien-search/case-fold-changed-hook nil
   "Normal hook run after toggle `case-fold-search'.")
 
 (defvar alien-search/ext-regexp-changed-hook nil
-  "Normal hook run after toggle `use-extended-regex-p'.")
+  "Normal hook run after toggle `alien-search/use-extended-regexp-p'.")
 
 (defvar alien-search/dot-match-changed-hook nil
-  "Normal hook run after toggle `dot-match-a-newline-p'.")
+  "Normal hook run after toggle `alien-search/dot-match-a-newline-p'.")
 
 
 ;; ----------------------------------------------------------------------------
@@ -396,16 +396,16 @@ commands `alien-search/toggle-case-fold',
 ;;  (alien-search/toggle-ext-regexp &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/toggle-ext-regexp (&optional no-message)
-  "Toggle `alien-search/use-extended-regex-p'."
+  "Toggle `alien-search/use-extended-regexp-p'."
   (interactive)
   (run-hooks 'alien-search/ext-regexp-will-change-hook)
-  (setq alien-search/use-extended-regex-p
-        (not alien-search/use-extended-regex-p))
+  (setq alien-search/use-extended-regexp-p
+        (not alien-search/use-extended-regexp-p))
   (run-hooks 'alien-search/ext-regexp-changed-hook)
   
   (when (not no-message)
     (minibuffer-message "[alien-search] %sextended regex"
-                        (if alien-search/use-extended-regex-p "" "no "))))
+                        (if alien-search/use-extended-regexp-p "" "no "))))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -547,13 +547,13 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
 
 (defcustom alien-search/search-option-indicator/ext-regexp-str "Ext"
   "A string displayed when the search option
-`alien-search/use-extended-regex-p' is on."
+`alien-search/use-extended-regexp-p' is on."
   :type 'string
   :group 'alien-search)
 
 (defcustom alien-search/search-option-indicator/no-ext-regex-str ""
   "A string displayed when the search option
-`alien-search/use-extended-regex-p' is off."
+`alien-search/use-extended-regexp-p' is off."
   :type 'string
   :group 'alien-search)
 
@@ -605,7 +605,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                 (if alien-search/dot-match-a-newline-p
                     alien-search/search-option-indicator/dot-match-str
                   alien-search/search-option-indicator/no-dot-match-str)
-                (if alien-search/use-extended-regex-p
+                (if alien-search/use-extended-regexp-p
                     alien-search/search-option-indicator/ext-regexp-str 
                   alien-search/search-option-indicator/no-ext-regex-str))))
 
@@ -668,7 +668,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                         ["Make . Match a Newline" alien-search/toggle-dot-match
                          :style radio :selected alien-search/dot-match-a-newline-p]
                         ["Use Extended Regular Expression" alien-search/toggle-ext-regexp
-                         :style radio :selected alien-search/use-extended-regex-p])
+                         :style radio :selected alien-search/use-extended-regexp-p])
                       "goto")
 
   ;; XXX: Should be removed?
@@ -918,7 +918,7 @@ the list `alien-search/replace/ovs-on-match/data'."
                   replacement
                   (if alien-search/dot-match-a-newline-p "DOT" "")
                   (if case-fold-search "" "CASE")
-                  (if alien-search/use-extended-regex-p "EXT" ""))))
+                  (if alien-search/use-extended-regexp-p "EXT" ""))))
     (alien-search/replace/parse-search-result result offset min max)
     
     ;; Detect index of neighborhood overlay of a pointer.
@@ -1576,7 +1576,7 @@ when it has nil value."
                             nil
                             (if alien-search/dot-match-a-newline-p "DOT" "")
                             (if case-fold-search "" "CASE")
-                            (if alien-search/use-extended-regex-p "EXT" "")))
+                            (if alien-search/use-extended-regexp-p "EXT" "")))
               (or coding
                   ;; Set CODING only if the current buffer locally
                   ;; binds buffer-file-coding-system.
@@ -1970,7 +1970,7 @@ and `re-search-backward' while isearch by alien-search is on."
                  nil
                  (if alien-search/dot-match-a-newline-p "DOT" "")
                  (if isearch-case-fold-search "" "CASE")
-                 (if alien-search/use-extended-regex-p "EXT" "")))
+                 (if alien-search/use-extended-regexp-p "EXT" "")))
           (dolist (be-lst alien-search/isearch/.cached-data)
             (setf (nth 0 be-lst)
                   (+ pt-min (nth 0 be-lst))) ;; [Count + Offset => Count]
@@ -2339,7 +2339,7 @@ is `eq' to the string WHEN-REGEXP-EQ."
 ;;                                               &optional no-message) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/re-builder/toggle-ext-regexp-on-target-buffer (&optional no-message)
-  "Toggle `alien-search/use-extended-regex-p' on `reb-target-buffer'."
+  "Toggle `alien-search/use-extended-regexp-p' on `reb-target-buffer'."
   (interactive)
   (cond
    (reb-target-buffer
@@ -2539,7 +2539,7 @@ and `re-search-backward' by `re-builder'."
                      nil
                      (if alien-search/dot-match-a-newline-p "DOT" "")
                      (if case-fold-search "" "CASE")
-                     (if alien-search/use-extended-regex-p "EXT" "")
+                     (if alien-search/use-extended-regexp-p "EXT" "")
                      (if (numberp reb-auto-match-limit)
                          (format "%s" reb-auto-match-limit)
                        "")))
