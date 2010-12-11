@@ -1756,6 +1756,14 @@ more information."
                               "Alien regexp"
                             "alien regexp")
                           'face 'minibuffer-prompt)
+                         t t ad-return-value)))
+  ;; Put search option indicator.
+  (when (string-match "\\(: \\)$" ad-return-value)
+    (setq ad-return-value
+          (replace-match (propertize
+                          (concat (alien-search/search-option-indicator/make-indicator)
+                                  ": ")
+                          'face 'minibuffer-prompt)
                          t t ad-return-value))))
 
 
