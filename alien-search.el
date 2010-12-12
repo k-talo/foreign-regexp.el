@@ -246,115 +246,6 @@ contains texts passed from Emacs to external programs."
 
 ;; ----------------------------------------------------------------------------
 ;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/with-search-option-indicator-on-minibuf-prompt &rest body)
-;;                                                           => RESULT OF BODY
-;; ----------------------------------------------------------------------------
-(defmacro* alien-search/alambda (parms &body body)
-  (declare (indent 1))
-  `(labels ((self ,parms ,@body))
-     #'self))
-(defmacro alien-search/with-search-option-indicator-on-minibuf-prompt (&rest body)
-  "Run `read-from-minibuffer' with displaying search option indicator
-on prompt string.
-
-Search option indicator will be updated whenever options are changed via
-commands `alien-search/toggle-case-fold',
-`alien-search/toggle-dot-match' and
-`alien-search/toggle-ext-regexp'."
-  (let* ((g-orig-read-from-minibuffer-fn (gensym))
-         (hook-togglefn-lst '((alien-search/case-fold-will-change-hook
-                               alien-search/toggle-case-fold)
-                              (alien-search/ext-regexp-will-change-hook
-                               alien-search/toggle-ext-regexp)
-                              (alien-search/dot-match-will-change-hook
-                               alien-search/toggle-dot-match))))
-    `(lexical-let ((,g-orig-read-from-minibuffer-fn (symbol-function 'read-from-minibuffer)))
-       (flet ((signal-option-changed
-               ()
-               (save-excursion
-                 ;; Current buffer must be a *Minibuf-N*.
-                 (when (minibufferp (current-buffer))
-                   ;; Preserve current input string and cursor
-                   ;; position to restart `read-from-minibuffer'.
-                   (let* ((cur-pt (point))
-                          (eol-pt (progn
-                                    (end-of-line)
-                                    (point)))
-                          (bol-pt (progn
-                                    (beginning-of-line)
-                                    (point)))
-                          (offset (1+ (- cur-pt bol-pt))))
-                     (setq deactivate-mark nil)
-                     (throw 'alien-search/util/.option-changed
-                            (cons (buffer-substring bol-pt eol-pt)
-                                  offset)))))))
-         (unwind-protect
-             (progn
-               (setf (symbol-function 'read-from-minibuffer)
-                     (lambda (prompt &optional initial-contents keymap read
-                                     hist defalut-value inherit-input-method)
-                       ;; Preserve current alien-search/*-will-change-hooks.
-                       (let (,@(mapcar (lambda (lst)
-                                         (let ((will-hook (car lst)))
-                                           `(,will-hook ,will-hook)))
-                                       hook-togglefn-lst)
-                             (initial-contents initial-contents)
-                             hook-fn-alst
-                             retval)
-                         ;; Do not call this `read-from-minibuffer' recursively.
-                         (setf (symbol-function 'read-from-minibuffer)
-                               ,g-orig-read-from-minibuffer-fn)
-
-                         (lexical-let ((cur-buf (current-buffer)))
-                           ;; Do not toggle search options of *Minibuf-N* while reading
-                           ;; regexps, toggle re-options of CURRENT BUFFER instead.
-                           ,@(mapcar (lambda (lst)
-                                       (let ((will-hook (car lst))
-                                             (toggle-fn (cadr lst)))
-                                         `(add-hook
-                                           (quote ,will-hook)
-                                           (alien-search/alambda ()
-                                             (with-current-buffer cur-buf
-                                               (let ((,will-hook ,will-hook)) ;Preserve
-                                                 ;; Do not call this hook recursively.
-                                                 (remove-hook (quote ,will-hook)
-                                                              #'self)
-                                                 (,toggle-fn t)))
-                                             (signal-option-changed)))))
-                                     hook-togglefn-lst)
-                           ;; Whenever search option is changed,
-                           ;; restart `read-from-minibuffer' to
-                           ;; redisplay prompt.
-                           (while (setq initial-contents
-                                        (catch 'alien-search/util/.option-changed
-                                          (setq retval
-                                                (funcall
-                                                 ,g-orig-read-from-minibuffer-fn
-                                                 ;; Put lighter before ": " of prompt.
-                                                 (concat (substring prompt
-                                                                    0
-                                                                    (string-match ": $" prompt))
-                                                         (alien-search/search-option-indicator/make-indicator)
-                                                         ": ")
-                                                 initial-contents
-                                                 keymap
-                                                 read
-                                                 hist
-                                                 defalut-value
-                                                 inherit-input-method))
-                                          nil)))
-                           retval))))
-               ,@body)
-           (setf (symbol-function 'read-from-minibuffer)
-                 ,g-orig-read-from-minibuffer-fn))))))
-
-;; ----------------------------------------------------------------------------
-;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
@@ -406,6 +297,94 @@ commands `alien-search/toggle-case-fold',
   (when (not no-message)
     (minibuffer-message "[alien-search] %sextended regex"
                         (if alien-search/use-extended-regexp-p "" "no "))))
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+;; XXX: Should be defined by macrolet
+;;      in `alien-search/with-search-option-indicator'?
+(defmacro* alien-search/alambda (parms &body body)
+  (declare (indent 1))
+  `(labels ((self ,parms ,@body))
+     #'self))
+
+;; XXX: Should be defined by flet
+;;      in `alien-search/with-search-option-indicator'?
+(defun alien-search/.signal-option-changed ()
+  (save-excursion
+    ;; Current buffer must be a *Minibuf-N*.
+    (when (minibufferp (current-buffer))
+      ;; Preserve current input string and cursor
+      ;; position to restart `read-from-minibuffer'.
+      (let* ((cur-pt (point))
+             (eol-pt (progn
+                       (end-of-line)
+                       (point)))
+             (bol-pt (progn
+                       (beginning-of-line)
+                       (point)))
+             (offset (1+ (- cur-pt bol-pt))))
+        (setq deactivate-mark nil)
+        (throw 'alien-search/.option-changed
+               (cons (buffer-substring bol-pt eol-pt)
+                     offset))))))
+
+(defadvice read-from-minibuffer (around alien-search/with-search-option-indicator
+                                        (prompt &optional initial-contents keymap read
+                                                hist defalut-value inherit-input-method))
+  "Run `read-from-minibuffer' with displaying search option indicator
+on prompt string.
+
+Search option indicator will be updated whenever options are changed via
+commands `alien-search/toggle-case-fold',
+`alien-search/toggle-dot-match' and
+`alien-search/toggle-ext-regexp'."
+  ;; Preserve current alien-search/*-will-change-hooks.
+  (let ((alien-search/case-fold-will-change-hook alien-search/case-fold-will-change-hook)
+        (alien-search/dot-match-will-change-hook alien-search/dot-match-will-change-hook)
+        (alien-search/ext-regexp-changed-hook    alien-search/ext-regexp-changed-hook)
+        (orig-prompt      (copy-sequence prompt))
+        (initial-contents initial-contents))
+    ;; Do not call this `read-from-minibuffer' recursively.
+    (ad-disable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+    (ad-activate 'read-from-minibuffer)
+    
+    ;; Do not toggle search options of *Minibuf-N* while reading
+    ;; regexps, toggle re-options of CURRENT BUFFER instead.
+    (lexical-let ((cur-buf (current-buffer)))
+      (mapcar
+       (lambda (lst)
+         (lexical-let ((hook (nth 0 lst)) (toggle-fn (nth 1 lst)))
+           (add-hook hook
+                     (alien-search/alambda ()
+                       (with-current-buffer cur-buf
+                         (progv (list hook) (list (symbol-value hook))
+                           ;; Do not call this hook recursively.
+                           (remove-hook hook #'self)
+                           ;; Run `alien-search/toggle-*' in current buffer.
+                           (funcall toggle-fn t)))
+                       ;; Exit from function `alien-search/toggle-*'
+                       ;; in *Minibuf-N*.
+                       (alien-search/.signal-option-changed)))))
+       '((alien-search/case-fold-will-change-hook  alien-search/toggle-case-fold)
+         (alien-search/ext-regexp-will-change-hook alien-search/toggle-ext-regexp)
+         (alien-search/dot-match-will-change-hook  alien-search/toggle-dot-match))))
+    
+    ;; Whenever search option is changed, restart `read-from-minibuffer' to
+    ;; redisplay prompt.
+    (while (setq initial-contents
+                 (catch 'alien-search/.option-changed
+                   ;; Put indicator before ": ".
+                   (ad-set-arg 0 (concat (substring orig-prompt
+                                                    0
+                                                    (string-match ": $" orig-prompt))
+                                         (alien-search/search-option-indicator/make-indicator)
+                                         ": "))
+                   ad-do-it
+                   nil)))))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -868,11 +847,13 @@ more information."
           (let ((query-replace-from-history-variable 'alien-search/history)
                 (query-replace-to-history-variable   'alien-search/history)
                 (query-replace-defaults              alien-search/replace/defaults))
-            (prog1 (alien-search/with-search-option-indicator-on-minibuf-prompt
-                    (query-replace-read-args
-                     (concat "Query replace alien regexp"
-                             (if (and transient-mark-mode mark-active) " in region" ""))
-                     t))
+            (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+            (ad-activate 'read-from-minibuffer)
+
+            (prog1 (query-replace-read-args
+                    (concat "Query replace alien regexp"
+                            (if (and transient-mark-mode mark-active) " in region" ""))
+                    t)
               (setq alien-search/replace/defaults query-replace-defaults)))))
      (list (nth 0 common) (nth 1 common) (nth 2 common)
            ;; These are done separately here
@@ -1513,10 +1494,12 @@ when it has nil value."
 ;;  (alien-search/occur regexp &optional nlines) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/occur (regexp &optional nlines)
+  
   (interactive (let ((regexp-history alien-search/history))
+                 (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+                 (ad-activate 'read-from-minibuffer)
                  (prog1
-                     (alien-search/with-search-option-indicator-on-minibuf-prompt
-                      (alien-search/occur-read-primary-args))
+                     (alien-search/occur-read-primary-args)
                    (setq alien-search/history regexp-history))))
   (let ((orig-occur-engine-fn (symbol-function 'occur-engine)))
     (setf (symbol-function 'occur-engine)
@@ -2347,6 +2330,7 @@ is `eq' to the string WHEN-REGEXP-EQ."
       (alien-search/toggle-ext-regexp no-message)))
    (t
     (error "[alien-search] No `reb-target-buffer'."))))
+
 
 ;; ----------------------------------------------------------------------------
 ;;
