@@ -2543,46 +2543,46 @@ and `re-search-backward' by `re-builder'."
     
       (setq alien-search/re-builder/.last-regexp
             regexp)))
-  (let ((forward-p (if (boundp 'alien-search/re-builder/forward-p)
-                       alien-search/re-builder/forward-p
-                     t))
-        (pt (with-current-buffer reb-target-buffer
-              (point))))
-    (if forward-p
-        ;; Search forward
-        (let* ((data alien-search/re-builder/.cached-data)
+  (with-current-buffer reb-target-buffer
+    (let ((forward-p (if (boundp 'alien-search/re-builder/forward-p)
+                         alien-search/re-builder/forward-p
+                       t))
+          (pt (point)))
+      (if forward-p
+          ;; Search forward
+          (let* ((data alien-search/re-builder/.cached-data)
+                 (be-lst (car (member-if
+                               #'(lambda (be-lst)
+                                   (<= pt (nth 0 be-lst)))
+                               data)))
+                 (beg (and be-lst (nth 0 be-lst)))
+                 (end (and be-lst (nth 1 be-lst))))
+            (when (and be-lst
+                       (if bound
+                           (<= end bound)
+                         t))
+              (set-match-data `(,beg
+                                ,end
+                                ,@(cddr be-lst)))
+              (goto-char end)
+              end))
+        ;; Search backward
+        (let* ((data (reverse alien-search/re-builder/.cached-data))
                (be-lst (car (member-if
                              #'(lambda (be-lst)
-                                 (<= pt (nth 0 be-lst)))
+                                 (<= (nth 1 be-lst) pt))
                              data)))
                (beg (and be-lst (nth 0 be-lst)))
                (end (and be-lst (nth 1 be-lst))))
           (when (and be-lst
                      (if bound
-                         (<= end bound)
+                         (<= bound beg)
                        t))
             (set-match-data `(,beg
                               ,end
                               ,@(cddr be-lst)))
-            (goto-char end)
-            end))
-      ;; Search backward
-      (let* ((data (reverse alien-search/re-builder/.cached-data))
-             (be-lst (car (member-if
-                           #'(lambda (be-lst)
-                               (<= (nth 1 be-lst) pt))
-                           data)))
-             (beg (and be-lst (nth 0 be-lst)))
-             (end (and be-lst (nth 1 be-lst))))
-        (when (and be-lst
-                   (if bound
-                       (<= bound beg)
-                     t))
-          (set-match-data `(,beg
-                            ,end
-                            ,@(cddr be-lst)))
-          (goto-char beg)
-          beg)))))
+            (goto-char beg)
+            beg))))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/reb-target-buffer-p buf) => BOOL
