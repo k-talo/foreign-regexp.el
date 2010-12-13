@@ -343,9 +343,9 @@ commands `alien-search/toggle-case-fold',
 `alien-search/toggle-dot-match' and
 `alien-search/toggle-ext-regexp'."
   ;; Preserve current alien-search/*-will-change-hooks.
-  (let ((alien-search/case-fold-will-change-hook alien-search/case-fold-will-change-hook)
-        (alien-search/dot-match-will-change-hook alien-search/dot-match-will-change-hook)
-        (alien-search/ext-regexp-changed-hook    alien-search/ext-regexp-changed-hook)
+  (let ((alien-search/case-fold-will-change-hook  alien-search/case-fold-will-change-hook)
+        (alien-search/dot-match-will-change-hook  alien-search/dot-match-will-change-hook)
+        (alien-search/ext-regexp-will-change-hook alien-search/ext-regexp-will-change-hook)
         (orig-prompt      (copy-sequence prompt))
         (initial-contents initial-contents))
     ;; Do not call this `read-from-minibuffer' recursively.
@@ -370,8 +370,8 @@ commands `alien-search/toggle-case-fold',
                        ;; in *Minibuf-N*.
                        (alien-search/.signal-option-changed)))))
        '((alien-search/case-fold-will-change-hook  alien-search/toggle-case-fold)
-         (alien-search/ext-regexp-will-change-hook alien-search/toggle-ext-regexp)
-         (alien-search/dot-match-will-change-hook  alien-search/toggle-dot-match))))
+         (alien-search/dot-match-will-change-hook  alien-search/toggle-dot-match)
+         (alien-search/ext-regexp-will-change-hook alien-search/toggle-ext-regexp))))
     
     ;; Whenever search option is changed, restart `read-from-minibuffer' to
     ;; redisplay prompt.
