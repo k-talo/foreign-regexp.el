@@ -385,7 +385,10 @@ on prompt string.
 Search option indicator will be updated whenever options are changed via
 commands `alien-search/toggle-case-fold',
 `alien-search/toggle-dot-match' and
-`alien-search/toggle-ext-regexp'."
+`alien-search/toggle-ext-regexp'.
+
+This advice will be enabled by `alien-search/query-replace'
+and `alien-search/occur'."
   ;; Preserve current alien-search/*-will-change-hooks.
   (let ((alien-search/case-fold-will-change-hook  alien-search/case-fold-will-change-hook)
         (alien-search/dot-match-will-change-hook  alien-search/dot-match-will-change-hook)
@@ -437,6 +440,28 @@ commands `alien-search/toggle-case-fold',
                     ;; initial-contents is thrown with
                     ;; a tag `alien-search/.option-changed'.
                     (cdr data)))))))
+
+(defadvice read-from-minibuffer (before alien-search/read-with-initial-contents
+                                        (prompt &optional initial-contents keymap read
+                                                hist default-value inherit-input-method))
+  "Set value of a variable `alien-search/.initial-contents'
+to INITIAL-CONTENTS of `read-from-minibuffer'.
+
+Value should be assigned to `alien-search/.initial-contents'
+by caller function with `LET' form.
+
+This advice will be enabled by `alien-search/re-builder/run-query-replace'
+and `alien-search/re-builder/run-occur'."
+  (ad-disable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+  (ad-activate 'read-from-minibuffer)
+  
+  (when (and (boundp 'alien-search/.initial-contents)
+             (stringp alien-search/.initial-contents))
+    (setq initial-contents
+          (cons alien-search/.initial-contents
+                (1+ (length alien-search/.initial-contents)))))
+  
+  (setq alien-search/.initial-contents nil))
 
 
 ;; ----------------------------------------------------------------------------
@@ -2406,12 +2431,113 @@ is `eq' to the string WHEN-REGEXP-EQ."
          (setf (symbol-function 're-search-forward)  ,g-orig-re-search-forward-fn)
          (setf (symbol-function 're-search-backward) ,g-orig-re-search-backward-fn)))))
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/exec-with-current-re re-var &rest body)
+;;                                                         => RESULT FROM BODY
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/re-builder/exec-with-current-re (re-var &rest body)
+  "When the current buffer is *RE-Builder*, exit `re-builder'
+and then run BODY with binding current RE to RE-VAR.
+
+NOTE: RE-VAR will be defined as lexical variable by this macro."
+  (declare (indent 1))
+  `(lexical-let ((,re-var (and (eq (get-buffer reb-buffer)
+                                   (current-buffer))
+                               (with-current-buffer (get-buffer reb-buffer)
+                                 (buffer-substring (point-min) (point-max))))))
+     (when ,re-var
+       (reb-quit)
+       (kill-buffer (get-buffer reb-buffer))
+       (set-buffer reb-target-buffer)
+       ,@body)))
+
 
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-query-replace) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-query-replace ()
+  "Run `alien-search/query-replace' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    (when (match-beginning 0)
+      (goto-char (match-beginning 0)))
+    
+    ;; Set initial contents for `read-from-minibuffer'.
+    (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+    (ad-activate 'read-from-minibuffer)
+      
+    (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+      (call-interactively 'alien-search/query-replace))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-occur) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-occur ()
+  "Run `alien-search/occur' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    ;; Set initial contents for `read-from-minibuffer'.
+    (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+    (ad-activate 'read-from-minibuffer)
+      
+    (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+      (call-interactively 'alien-search/occur))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-isearch-forward) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-isearch-forward ()
+  "Run `alien-search/isearch-forward' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    (add-hook 'isearch-mode-hook
+              (alien-search/alambda ()
+                (remove-hook 'isearch-mode-hook
+                             #'self)
+                (isearch-push-state)
+                (setq isearch-string  regexp
+                      isearch-message regexp)))
+    (alien-search/isearch-forward)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-isearch-backward) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-isearch-backward ()
+  "Run `alien-search/isearch-backward' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    (add-hook 'isearch-mode-hook
+              (alien-search/alambda ()
+                (remove-hook 'isearch-mode-hook
+                             #'self)
+                (isearch-push-state)
+                (setq isearch-string  regexp
+                      isearch-message regexp)))
+    (alien-search/isearch-backward)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-non-incremental-search-forward) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-non-incremental-search-forward ()
+  "Run `alien-search/non-incremental/search-forward' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    (alien-search/non-incremental/search-forward regexp)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/run-non-incremental-search-backward) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/run-non-incremental-search-backward ()
+  "Run `alien-search/non-incremental/search-backward' with current RE."
+  (interactive)
+  (alien-search/re-builder/exec-with-current-re regexp
+    (alien-search/non-incremental/search-forward regexp)))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/toggle-case-fold-on-target-buffer
@@ -2602,6 +2728,19 @@ and `alien-search/occur'."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/get-current-regexp) => STRING or NIL
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/get-current-regexp ()
+  "Returns regular expression in buffer *RE-Builder*.
+
+When the current buffer is not *RE-Builder*, returns nil."
+  (let* ((reb-buf (get-buffer reb-buffer))
+         (regexp (when (eq reb-buf (current-buffer))
+                   (with-current-buffer reb-buf
+                     (buffer-substring (point-min) (point-max))))))
+    regexp))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/get-syntax-lst) => LIST
