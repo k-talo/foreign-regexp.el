@@ -395,51 +395,56 @@ and `alien-search/occur'."
         (alien-search/ext-regexp-will-change-hook alien-search/ext-regexp-will-change-hook)
         (orig-prompt      (copy-sequence prompt))
         (initial-contents initial-contents))
-    ;; Do not call this `read-from-minibuffer' recursively.
-    (ad-disable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-    (ad-activate 'read-from-minibuffer)
+    (unwind-protect
+        (progn
+          ;; Do not call this `read-from-minibuffer' recursively.
+          (ad-disable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+          (ad-activate 'read-from-minibuffer)
     
-    ;; Do not toggle search options of *Minibuf-N* while reading
-    ;; regexps, toggle re-options of CURRENT BUFFER instead.
-    (lexical-let ((cur-buf (current-buffer)))
-      (mapcar
-       (lambda (lst)
-         (lexical-let ((hook (nth 0 lst)) (toggle-fn (nth 1 lst)))
-           (add-hook hook
-                     (alien-search/alambda ()
-                       (with-current-buffer cur-buf
-                         (progv (list hook) (list (symbol-value hook))
-                           ;; Do not call this hook recursively.
-                           (remove-hook hook #'self)
-                           ;; Run `alien-search/toggle-*' in current buffer.
-                           (funcall toggle-fn t)))
-                       ;; Exit from function `alien-search/toggle-*'
-                       ;; in *Minibuf-N*.
-                       (alien-search/.signal-option-changed)))))
-       '((alien-search/case-fold-will-change-hook  alien-search/toggle-case-fold)
-         (alien-search/dot-match-will-change-hook  alien-search/toggle-dot-match)
-         (alien-search/ext-regexp-will-change-hook alien-search/toggle-ext-regexp))))
+          ;; Do not toggle search options of *Minibuf-N* while reading
+          ;; regexps, toggle re-options of CURRENT BUFFER instead.
+          (lexical-let ((cur-buf (current-buffer)))
+            (mapcar
+             (lambda (lst)
+               (lexical-let ((hook (nth 0 lst)) (toggle-fn (nth 1 lst)))
+                 (add-hook hook
+                           (alien-search/alambda ()
+                             (with-current-buffer cur-buf
+                               (progv (list hook) (list (symbol-value hook))
+                                 ;; Do not call this hook recursively.
+                                 (remove-hook hook #'self)
+                                 ;; Run `alien-search/toggle-*' in current buffer.
+                                 (funcall toggle-fn t)))
+                             ;; Exit from function `alien-search/toggle-*'
+                             ;; in *Minibuf-N*.
+                             (alien-search/.signal-option-changed)))))
+             '((alien-search/case-fold-will-change-hook  alien-search/toggle-case-fold)
+               (alien-search/dot-match-will-change-hook  alien-search/toggle-dot-match)
+               (alien-search/ext-regexp-will-change-hook alien-search/toggle-ext-regexp))))
     
-    ;; Whenever search option is changed, restart `read-from-minibuffer' to
-    ;; redisplay prompt.
-    (while (setq initial-contents
-                 (alien-search/catch-case data
-                     (progn
-                       ;; Put indicator on prompt.
-                       (setq prompt
-                             (concat (substring orig-prompt
-                                                0
-                                                (string-match ": $" orig-prompt))
-                                     (alien-search/search-option-indicator/make-indicator)
-                                     ": "))
-                       ;; Call read-from-minibuffer.
-                       ad-do-it
-                       ;; Break when nothing has been thrown.
-                       nil)
-                   (alien-search/.option-changed
-                    ;; initial-contents is thrown with
-                    ;; a tag `alien-search/.option-changed'.
-                    (cdr data)))))))
+          ;; Whenever search option is changed, restart `read-from-minibuffer' to
+          ;; redisplay prompt.
+          (while (setq initial-contents
+                       (alien-search/catch-case data
+                           (progn
+                             ;; Put indicator on prompt.
+                             (setq prompt
+                                   (concat (substring orig-prompt
+                                                      0
+                                                      (string-match "\\( with\\)?: $" orig-prompt))
+                                           (alien-search/search-option-indicator/make-indicator)
+                                           (match-string 1 orig-prompt)
+                                           ": "))
+                             ;; Call read-from-minibuffer.
+                             ad-do-it
+                             ;; Break when nothing has been thrown.
+                             nil)
+                         (alien-search/.option-changed
+                          ;; initial-contents is thrown with
+                          ;; a tag `alien-search/.option-changed'.
+                          (cdr data))))))
+      (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+      (ad-activate 'read-from-minibuffer))))
 
 (defadvice read-from-minibuffer (before alien-search/read-with-initial-contents
                                         (prompt &optional initial-contents keymap read
@@ -975,14 +980,18 @@ more information."
           (let ((query-replace-from-history-variable 'alien-search/history)
                 (query-replace-to-history-variable   'alien-search/history)
                 (query-replace-defaults              alien-search/replace/defaults))
-            (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-            (ad-activate 'read-from-minibuffer)
-
-            (prog1 (query-replace-read-args
-                    (concat "Query replace alien regexp"
-                            (if (and transient-mark-mode mark-active) " in region" ""))
-                    t)
-              (setq alien-search/replace/defaults query-replace-defaults)))))
+            (unwind-protect
+                (progn
+                  (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+                  (ad-activate 'read-from-minibuffer)
+                  
+                  (prog1 (query-replace-read-args
+                          (concat "Query replace alien regexp"
+                                  (if (and transient-mark-mode mark-active) " in region" ""))
+                          t)
+                    (setq alien-search/replace/defaults query-replace-defaults)))
+              (ad-disable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+              (ad-activate 'read-from-minibuffer)))))
      (list (nth 0 common) (nth 1 common) (nth 2 common)
            ;; These are done separately here
            ;; so that command-history will record these expressions
@@ -1645,11 +1654,15 @@ when it has nil value."
 ;; ----------------------------------------------------------------------------
 (defun alien-search/occur-aux (regexp &optional nlines)
   (interactive (let ((regexp-history alien-search/history))
-                 (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-                 (ad-activate 'read-from-minibuffer)
-                 (prog1
-                     (alien-search/occur-read-primary-args)
-                   (setq alien-search/history regexp-history))))
+                 (unwind-protect
+                     (progn
+                       (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+                       (ad-activate 'read-from-minibuffer)
+                       (prog1
+                           (alien-search/occur-read-primary-args)
+                         (setq alien-search/history regexp-history)))
+                   (ad-disable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+                   (ad-activate 'read-from-minibuffer))))
   (let ((orig-occur-engine-fn (symbol-function 'occur-engine)))
     (setf (symbol-function 'occur-engine)
           (symbol-function 'alien-search/occur/occur-engine))
@@ -1953,12 +1966,21 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
-  ;; Just for prompt message.
-  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-  (ad-activate 'isearch-message-prefix)
-  
-  (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
+  (unwind-protect
+      (progn
+        ;; Just for prompt message.
+        (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+        (ad-activate 'isearch-message-prefix)
+        
+        (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
+    (ad-disable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+    (ad-activate 'isearch-message-prefix)))
 
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/isearch-backward &optional not-regexp no-recursive-edit)
+;;                                                                     => VOID
+;; ----------------------------------------------------------------------------
 (defun alien-search/isearch-backward (&optional not-regexp no-recursive-edit)
   "Do isearch with a help from external program.
 
@@ -1976,11 +1998,15 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
-  ;; Just for prompt message.
-  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-  (ad-activate 'isearch-message-prefix)
-  
-  (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
+  (unwind-protect
+      (progn
+        ;; Just for prompt message.
+        (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+        (ad-activate 'isearch-message-prefix)
+        
+        (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
+    (ad-disable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+    (ad-activate 'isearch-message-prefix)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -2468,12 +2494,16 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (when (match-beginning 0)
       (goto-char (match-beginning 0)))
     
-    ;; Set initial contents for `read-from-minibuffer'.
-    (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
-    (ad-activate 'read-from-minibuffer)
-      
-    (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
-      (call-interactively 'alien-search/query-replace))))
+    (unwind-protect
+        (progn
+          ;; Set initial contents for `read-from-minibuffer'.
+          (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+          (ad-activate 'read-from-minibuffer)
+          
+          (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+            (call-interactively 'alien-search/query-replace)))
+      (ad-disable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+      (ad-activate 'read-from-minibuffer))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/run-occur) => VOID
@@ -2482,12 +2512,16 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
   "Run `alien-search/occur' with current RE."
   (interactive)
   (alien-search/re-builder/exec-with-current-re regexp
-    ;; Set initial contents for `read-from-minibuffer'.
-    (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
-    (ad-activate 'read-from-minibuffer)
-      
-    (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
-      (call-interactively 'alien-search/occur))))
+    (unwind-protect
+        (progn
+          ;; Set initial contents for `read-from-minibuffer'.
+          (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+          (ad-activate 'read-from-minibuffer)
+          
+          (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+            (call-interactively 'alien-search/occur)))
+      (ad-disable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
+      (ad-activate 'read-from-minibuffer))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/run-isearch-forward) => VOID
