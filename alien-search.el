@@ -246,6 +246,63 @@ contains texts passed from Emacs to external programs."
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/catch-case var bodyform &rest handlers) => RESULT OF BODYFORM
+;;                                                           OR HANDLERS
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/catch-case (var bodyform &rest handlers)
+  "Regain control when a tag is thrown.
+Executes BODYFORM and returns its value if no tag is thrown.
+Each element of HANDLERS looks like (TAG-NAME BODY...)
+where the BODY is made of Lisp expressions.
+
+A handler is applicable to an tag if TAG-NAME is one of
+the tag names.
+If an tag is thrown, the first applicable handler is run.
+
+The car of a handler may be a list of tag names
+instead of a single tag name.  Then it handles all of them.
+
+When a handler handles an error, control returns to the
+`alien-search/catch-case' and it executes the handler's
+BODY... with VAR bound to (TAG-NAME . THROWNED-VALUE).
+Then the value of the last BODY form is returned from the
+`alien-search/catch-case' expression.
+
+See also the function `throw' for more info."
+  (declare (indent 2))
+  (let* ((g-retval (gensym))
+         (bodyform (list 'setq g-retval bodyform))
+         var-lst
+         clause-lst)
+    (dolist (h handlers)
+      (let* ((tag-lst
+              (cond
+               ((listp (car h)) (car h))
+               (t (list (car h)))))
+             (var-tag-val (gensym)))
+        (dolist (tag tag-lst)
+          (push (list var-tag-val `(quote ,var-tag-val)) var-lst)
+          (setq bodyform
+                `(setq ,var-tag-val (catch (quote ,tag)
+                                      ,bodyform
+                                      ,var-tag-val)))
+          (push `((not (eq ,var-tag-val (quote ,var-tag-val)))
+                  (let ((,var (cons (quote ,tag) ,var-tag-val))) ,@(cdr h)))
+                clause-lst))))
+    `(let (,g-retval ,@var-lst)
+       ,bodyform
+       (cond
+        ,@clause-lst
+        (t ,g-retval)))))
+
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
@@ -314,23 +371,10 @@ contains texts passed from Emacs to external programs."
 ;; XXX: Should be defined by flet
 ;;      in `alien-search/with-search-option-indicator'?
 (defun alien-search/.signal-option-changed ()
-  (save-excursion
-    ;; Current buffer must be a *Minibuf-N*.
-    (when (minibufferp (current-buffer))
-      ;; Preserve current input string and cursor
-      ;; position to restart `read-from-minibuffer'.
-      (let* ((cur-pt (point))
-             (eol-pt (progn
-                       (end-of-line)
-                       (point)))
-             (bol-pt (progn
-                       (beginning-of-line)
-                       (point)))
-             (offset (1+ (- cur-pt bol-pt))))
-        (setq deactivate-mark nil)
-        (throw 'alien-search/.option-changed
-               (cons (buffer-substring bol-pt eol-pt)
-                     offset))))))
+  (let ((contents (alien-search/read-minibuf-contents)))
+    (when contents
+      (throw 'alien-search/.option-changed
+             contents))))
 
 (defadvice read-from-minibuffer (around alien-search/with-search-option-indicator
                                         (prompt &optional initial-contents keymap read
@@ -376,15 +420,24 @@ commands `alien-search/toggle-case-fold',
     ;; Whenever search option is changed, restart `read-from-minibuffer' to
     ;; redisplay prompt.
     (while (setq initial-contents
-                 (catch 'alien-search/.option-changed
-                   ;; Put indicator before ": ".
-                   (ad-set-arg 0 (concat (substring orig-prompt
-                                                    0
-                                                    (string-match ": $" orig-prompt))
-                                         (alien-search/search-option-indicator/make-indicator)
-                                         ": "))
-                   ad-do-it
-                   nil)))))
+                 (alien-search/catch-case data
+                     (progn
+                       ;; Put indicator on prompt.
+                       (setq prompt
+                             (concat (substring orig-prompt
+                                                0
+                                                (string-match ": $" orig-prompt))
+                                     (alien-search/search-option-indicator/make-indicator)
+                                     ": "))
+                       ;; Call read-from-minibuffer.
+                       ad-do-it
+                       ;; Break when nothing has been thrown.
+                       nil)
+                   (alien-search/.option-changed
+                    ;; initial-contents is thrown with
+                    ;; a tag `alien-search/.option-changed'.
+                    (cdr data)))))))
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -492,6 +545,30 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
       (and (file-exists-p fn-in-result      ) (delete-file fn-in-result      ))
       (and (file-exists-p fn-program        ) (delete-file fn-program        ))
       (kill-buffer proc-output-buf))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/read-minibuf-contents) => (STRING . POSITION)
+;; ----------------------------------------------------------------------------
+(defun alien-search/read-minibuf-contents ()
+  "Returns a cons (STRING . POSITION) where
+STRING is minibuffer contents and POSITION is
+current cursor position in minibuffer."
+  (save-excursion
+    ;; Current buffer must be a *Minibuf-N*.
+    (when (minibufferp (current-buffer))
+      ;; Preserve current input string and cursor
+      ;; position to restart `read-from-minibuffer'.
+      (let* ((cur-pt (point))
+             (eol-pt (progn
+                       (end-of-line)
+                       (point)))
+             (bol-pt (progn
+                       (beginning-of-line)
+                       (point)))
+             (offset (1+ (- cur-pt bol-pt))))
+        (setq deactivate-mark nil)
+        (cons (buffer-substring bol-pt eol-pt)
+                     offset)))))
 
 
 ;;; ===========================================================================
