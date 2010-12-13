@@ -1571,7 +1571,6 @@ when it has nil value."
 ;;  (alien-search/occur regexp &optional nlines) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/occur (regexp &optional nlines)
-  
   (interactive (let ((regexp-history alien-search/history))
                  (ad-enable-advice 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
                  (ad-activate 'read-from-minibuffer)
