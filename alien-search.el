@@ -643,7 +643,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                       nil
                       '("Alien Search Options"
                         ["Case Insensitive" alien-search/toggle-case-fold
-                         :style radio :selected (not case-fold-search)]
+                         :style radio :selected case-fold-search]
                         ["Make . Match a Newline" alien-search/toggle-dot-match
                          :style radio :selected alien-search/dot-match-a-newline-p]
                         ["Use Extended Regular Expression" alien-search/toggle-ext-regexp
