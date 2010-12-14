@@ -2452,7 +2452,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
           (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
           (ad-activate 'read-from-minibuffer)
           
-          (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+          (let ((alien-search/.initial-contents regexp)
+                (this-command 'alien-search/query-replace)) ;; For read-from-minibuffer
             (call-interactively 'alien-search/query-replace)))
       (ad-disable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
       (ad-activate 'read-from-minibuffer))))
@@ -2470,7 +2471,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
           (ad-enable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
           (ad-activate 'read-from-minibuffer)
           
-          (let ((alien-search/.initial-contents regexp)) ;; For read-from-minibuffer
+          (let ((alien-search/.initial-contents regexp)
+                (this-command 'alien-search/occur)) ;; For read-from-minibuffer
             (call-interactively 'alien-search/occur)))
       (ad-disable-advice 'read-from-minibuffer 'before 'alien-search/read-with-initial-contents)
       (ad-activate 'read-from-minibuffer))))
@@ -2992,5 +2994,353 @@ to each search option changed hook."
   (when (not (get this-command 'alien-search/nonincremental-command-p))
     (setq alien-search/non-incremental/.cached-data nil)
     (remove-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+
+
+;;; ===========================================================================
+;;;
+;;;  Transition among alien-search commands.
+;;;
+;;; ===========================================================================
+
+(defvar alien-search/transition/.running-cmd nil
+  "Internal variable.")
+
+(defvar alien-search/transition/command-table
+  '((:label re-builder
+            :op-kind    re-builder-cmd
+            :command    re-builder)
+    (:label isearch-forward
+            :op-kind    isearch-cmd
+            :command    alien-search/isearch-forward)
+    (:label isearch-backward
+            :op-kind    isearch-cmd
+            :command    alien-search/isearch-backward)
+    (:label replace
+            :op-kind    minibuf-cmd
+            :command    alien-search/query-replace
+            ;; required by minibuf-cmd.
+            :transition-allowed-in query-replace-read-from)
+    (:label occur
+            :op-kind    minibuf-cmd
+            :command    alien-search/occur
+            ;; required by minibuf-cmd.
+            :transition-allowed-in alien-search/occur)
+    (:label noinc-fwd
+            :op-kind    minibuf-cmd
+            :command    alien-search/non-incremental/search-forward
+            ;; required by minibuf-cmd.
+            :transition-allowed-in alien-search/non-incremental/search-forward)
+    (:label noinc-bkwd
+            :op-kind    minibuf-cmd
+            :command    alien-search/non-incremental/search-backward
+            ;; required by minibuf-cmd.
+            :transition-allowed-in alien-search/non-incremental/search-backward))
+    "Not documented yet.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/transition/setup sym-table) => VOID
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/transition/setup (sym-table)
+  "Define transitions among each command."
+  (let ((retval (list 'progn)))
+    (dolist (rec (symbol-value sym-table))
+      (let ((table                 (copy-list (symbol-value sym-table)))
+            (label                 (cadr (memq :label   rec)))
+            (op-kind               (cadr (memq :op-kind rec)))
+            (command               (cadr (memq :command rec)))
+            (transition-allowed-in (cadr (memq :transition-allowed-in rec))))
+        
+        (setq table (delq rec table))
+        
+        (dolist (targ-rec table)
+          (let ((targ-label   (cadr (memq :label   targ-rec)))
+                (targ-op-kind (cadr (memq :op-kind targ-rec)))
+                (targ-command (cadr (memq :command targ-rec))))
+            (case op-kind
+              ((re-builder-cmd)
+               ;; Nothing to do.
+               ;;
+               ;; Commands make transition from `re-builder' is
+               ;; pre-defined as `alien-search/re-builder/run-*'.
+               )
+              ((isearch-cmd)
+               (let ((ad-name-make-transition-to (intern
+                                                  (format
+                                                   "alien-search/transition/%s/make-transition-to-%s"
+                                                   label targ-label)))
+                     (fn-name-turn-on-throw      (intern
+                                                  (format
+                                                   "alien-search/transition/%s/turn-on-make-transition-to-%s"
+                                                   label targ-label)))
+                     (fn-name-turn-off-throw     (intern
+                                                  (format
+                                                   "alien-search/transition/%s/turn-off-make-transition-to-%s"
+                                                   label targ-label))))
+                 (nconc
+                  retval
+                  `(
+                    ;; Advise other alien-search commands to throw a tag
+                    ;; so that we can exit current alien-search command and
+                    ;; make transition to another one.
+                    (defadvice ,targ-command (around
+                                              ,ad-name-make-transition-to
+                                              (&rest args))
+                      "Throw a tag so that we can exit current alien-search
+command and make transition to another one."
+                      (lexical-let ((regexp isearch-string))
+                        (ad-disable-advice (quote ,targ-command)
+                                           'around
+                                           (quote ,ad-name-make-transition-to))
+                        (ad-activate (quote ,targ-command))
+                        
+                        (isearch-exit)
+                        
+                        (run-with-idle-timer
+                         0 nil
+                         (lambda ()
+                           ,@(case targ-op-kind
+                               ((re-builder-cmd)
+                                `((re-builder)
+                                  (with-current-buffer (get-buffer reb-buffer)
+                                    (delete-region (point-min) (point-max))
+                                    (insert regexp))))
+                               ((minibuf-cmd)
+                                `(
+                                  ;; Set initial contents for `read-from-minibuffer',
+                                  ;; then call another alien-search command.
+                                  (unwind-protect
+                                      (progn
+                                        (ad-enable-advice 'read-from-minibuffer
+                                                          'before
+                                                          'alien-search/read-with-initial-contents)
+                                        (ad-activate 'read-from-minibuffer)
+                                        
+                                     (let ((alien-search/.initial-contents regexp)
+                                           (this-command (quote ,targ-command)))
+                                       (call-interactively (quote ,targ-command))))
+                                 (ad-disable-advice 'read-from-minibuffer
+                                                    'before
+                                                    'alien-search/read-with-initial-contents)
+                                 (ad-activate 'read-from-minibuffer)))))))))
+                    
+                    ;; When `alien-search/isearch' is turned on, advise another
+                    ;; alien-search commands to exit `alien-search/isearch' and
+                    ;; transit to them when they are called.
+                    (defun ,fn-name-turn-on-throw ()
+                      "When `alien-search/isearch' is turned on, advise another
+alien-search commands to exit `alien-search/isearch' and
+transit to them when they are called."
+                      (ad-enable-advice (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
+                      (ad-activate (quote ,targ-command)))
+                    (add-hook 'isearch-mode-hook (quote ,fn-name-turn-on-throw))
+                    
+                    ;; Disable advices to another alien-search commands
+                    ;; when `alien-search/isearch' is turned off.
+                    (defun ,fn-name-turn-off-throw ()
+                      "Disable advices to another alien-search commands
+when `alien-search/isearch' is turned off."
+                      (ad-disable-advice (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
+                      (ad-activate (quote ,targ-command)))
+                    (add-hook 'isearch-mode-end-hook (quote ,fn-name-turn-off-throw))))))
+                      
+              ((minibuf-cmd)
+               (let ((orig-command                (intern
+                                                   (format
+                                                    "alien-search/transition/orig-%s"
+                                                    command)))
+                     (ad-name-catch-transition-to (intern
+                                                   (format
+                                                    "alien-search/transition/%s/catch-transition-to-%s"
+                                                    label targ-label)))
+                     (ad-name-throw-transition-to (intern
+                                                   (format
+                                                    "alien-search/transition/%s/throw-transition-to-%s"
+                                                    label targ-label)))
+                     (ad-name-allow-transition    (intern
+                                                   (format
+                                                    "alien-search/transition/%s/allow-transition-to-%s"
+                                                    label targ-label)))
+                     (g-transition-allowed-p      (gensym)))
+
+                 ;; For two purposes below, we wrap alien-search
+                 ;; command which run `read-from-minibuffer' to
+                 ;; read input from minibuffer.
+                 ;;
+                 ;;   1. To set initial contents of `read-from-minibuffer',
+                 ;;      we should run advices of the command before
+                 ;;      `interactive' form.
+                 ;;
+                 ;;      So we wrap original command with a wrapper
+                 ;;      command and set advice to it.
+                 ;;
+                 ;;      Now we can run `interactive' form of original
+                 ;;      command after advices has run, by calling
+                 ;;      original function interactively from inside
+                 ;;      of wrapper command.
+                 ;;
+                 ;;   2. Remember running alien-search command to
+                 ;;      prevent duplicated calls while minibuffer
+                 ;;      is active.
+                 (when (not (fboundp orig-command))
+                   (setf (symbol-function orig-command) (symbol-function command))
+                   ;; XXX: Update `orig-command' when the function
+                   ;;      is redefined.
+                   (lexical-let ((orig-command orig-command)
+                                 (fn-label command))
+                     (eval `(progn
+                              (defadvice ,command (around alien-search/orig-fn (&rest args))
+                                (interactive)
+                                "For two purposes below, we wrap alien-search
+command which run `read-from-minibuffer' to
+read input from minibuffer.
+
+  1. To set initial contents of `read-from-minibuffer',
+     we should run advices of the command before
+     `interactive' form.
+
+     So we wrap original command with a wrapper
+     command and set advice to it.
+
+     Now we can run `interactive' form of original
+     command after advices has run, by calling
+     original function interactively from inside
+     of wrapper command.
+
+  2. Remember running alien-search command to
+     prevent duplicated calls while minibuffer
+     is active."
+                                (if (eq this-command
+                                        (quote ,command))
+                                    ;; Called interactively.
+                                    (unwind-protect
+                                        (progn
+                                          ;; Remember current command to
+                                          ;; prevent duplicate calls.
+                                          (setq alien-search/transition/.running-cmd this-command)
+                                          
+                                          (call-interactively (quote ,orig-command)))
+                                      (setq alien-search/transition/.running-cmd nil))
+                                  ;; Called non-interactively.
+                                  (apply (quote ,orig-command) args)))
+                              (ad-activate (quote ,command))))))
+                 (nconc
+                  retval
+                  `(
+                    ;; Advice a function to allow making transition to
+                    ;; another alien-search command while it is running.
+                    (defadvice ,transition-allowed-in (around
+                                                       ,ad-name-allow-transition
+                                                       (&rest args))
+                      "Allow making transition to another alien-search command
+while this function is running."
+                      (let ((,g-transition-allowed-p t))
+                        ad-do-it))
+                    (ad-activate (quote ,transition-allowed-in))
+                    
+                    ;; Advise to alien-search command, which reads
+                    ;; input from minibuffer, to make transition to
+                    ;; another alien-search command when it is called.
+                    (defadvice ,command (around
+                                         ,ad-name-catch-transition-to
+                                         (&rest args))
+                      "Make transition to another alien-search command
+when it is called."
+                      ;; Prevent duplicate calls.
+                      (when (eq this-command
+                                alien-search/transition/.running-cmd)
+                        (error "[alien-search] Command attempted to use minibuffer while in minibuffer"))
+                      
+                      (unwind-protect
+                          (progn
+                            (ad-enable-advice (quote ,targ-command)
+                                              'around
+                                              (quote ,ad-name-throw-transition-to))
+                            (ad-activate (quote ,targ-command))
+                              
+                            (alien-search/catch-case var
+                                ad-do-it
+                              (,ad-name-throw-transition-to
+                               (lexical-let ((regexp (cadr var))
+                                             (orig-messasge-fn
+                                              (symbol-function 'message)))
+                                 (run-with-idle-timer
+                                  0 nil
+                                  (lambda ()
+                                    ,@(case targ-op-kind
+                                        ((re-builder-cmd)
+                                         `((let ((this-command (quote ,targ-command)))
+                                             (call-interactively (quote ,targ-command)))
+                                           (with-current-buffer (get-buffer reb-buffer)
+                                             (delete-region (point-min) (point-max))
+                                             (insert regexp))))
+                                        ((isearch-cmd)
+                                         `((add-hook 'isearch-mode-hook
+                                                     (alien-search/alambda ()
+                                                       (remove-hook 'isearch-mode-hook
+                                                                    #'self)
+                                                       (isearch-push-state)
+                                                       (setq isearch-string  regexp
+                                                             isearch-message regexp)))
+                                           (let ((this-command (quote ,targ-command)))
+                                             (call-interactively (quote ,targ-command)))))
+                                        ((minibuf-cmd)
+                                         `((unwind-protect
+                                               ;; Set initial contents for `read-from-minibuffer',
+                                               ;; then call another alien-search command.
+                                               (progn
+                                                 (ad-enable-advice 'read-from-minibuffer
+                                                                   'before
+                                                                   'alien-search/read-with-initial-contents)
+                                                 (ad-activate 'read-from-minibuffer)
+                                                 
+                                                 (let ((alien-search/.initial-contents regexp)
+                                                       (this-command (quote ,targ-command)))
+                                                   (call-interactively (quote ,targ-command))))
+                                             (ad-disable-advice 'read-from-minibuffer
+                                                                'before
+                                                                'alien-search/read-with-initial-contents)
+                                             (ad-activate 'read-from-minibuffer)))))))
+                                 ;; FIXME: Prevent displaying message
+                                 ;;        "Back to top level.".
+                                 (top-level)))))
+                        (ad-disable-advice (quote ,targ-command) 'around (quote ,ad-name-throw-transition-to))
+                        (ad-activate (quote ,targ-command))))
+                    (ad-activate (quote ,command))
+                    
+                    ;; Advise other alien-search commands to throw a tag
+                    ;; so that we can exit current alien-search command and
+                    ;; make transition to another one.
+                    (defadvice ,targ-command (around ,ad-name-throw-transition-to (&rest args))
+                      "Throw a tag so that we can exit current alien-search command and
+make a transition to another one.
+
+Current contents of minibuffer will be thrown
+as the value of a tag."
+                      (cond
+                       ((and (boundp (quote ,g-transition-allowed-p))
+                             ,g-transition-allowed-p)
+                        (let ((contents (alien-search/read-minibuf-contents)))
+                          (when contents
+                            (throw (quote ,ad-name-throw-transition-to)
+                                   contents))))
+                       (t
+                        ad-do-it))))))))))))
+    retval))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Main
+;;
+;; ----------------------------------------------------------------------------
+
+(alien-search/transition/setup alien-search/transition/command-table)
 
 ;;; alien-search.el ends here
