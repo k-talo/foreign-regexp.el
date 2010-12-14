@@ -941,36 +941,10 @@ See also `query-replace-defaults'.")
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/query-replace) => VOID
+;;  (alien-search/query-replace pattern replacement
+;;                              &optional delimited start end) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/query-replace ()
-  "Do `query-replace' with a help from external program.
-
-See `isearch-forward-regexp' and `isearch-backward-regexp' for
-more information."
-  (interactive)
-  (unwind-protect
-      (progn
-        (ad-enable-advice 're-builder 'around 'alien-search/re-builder/signal-switch-to-re-builder)
-        (ad-activate 're-builder)
-        
-        ;; When `re-builder' is called from minibuffer,
-        ;; exit from minibuffer then activate `re-builder'.
-        (alien-search/catch-case data
-            (call-interactively 'alien-search/query-replace-aux)
-          (alien-search/.switch-to-re-builder
-           (re-builder)
-           (delete-region (point-min) (point-max))
-           (insert (cadr data)))))
-    (ad-disable-advice 're-builder 'around 'alien-search/re-builder/signal-switch-to-re-builder)
-    (ad-activate 're-builder)))
-    
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/query-replace-aux pattern replacement
-;;                                  &optional delimited start end) => VOID
-;; ----------------------------------------------------------------------------
-(defun alien-search/query-replace-aux (pattern replacement &optional delimited start end)
+(defun alien-search/query-replace (pattern replacement &optional delimited start end)
   "Do `query-replace' with a help from external program.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
@@ -1628,31 +1602,9 @@ when it has nil value."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/occur) => VOID
+;;  (alien-search/occur regexp &optional nlines) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/occur ()
-  (interactive)
-  (unwind-protect
-      (progn
-        (ad-enable-advice 're-builder 'around 'alien-search/re-builder/signal-switch-to-re-builder)
-        (ad-activate 're-builder)
-        
-        ;; When `re-builder' is called from minibuffer,
-        ;; exit from minibuffer then activate `re-builder'.
-        (alien-search/catch-case data
-            (call-interactively 'alien-search/occur-aux)
-          (alien-search/.switch-to-re-builder
-           (re-builder)
-           (delete-region (point-min) (point-max))
-           (insert (cadr data)))))
-    (ad-disable-advice 're-builder 'around 'alien-search/re-builder/signal-switch-to-re-builder)
-    (ad-activate 're-builder)))
-    
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/occur-aux regexp &optional nlines) => VOID
-;; ----------------------------------------------------------------------------
-(defun alien-search/occur-aux (regexp &optional nlines)
+(defun alien-search/occur (regexp &optional nlines)
   (interactive (let ((regexp-history alien-search/history))
                  (unwind-protect
                      (progn
@@ -2621,19 +2573,6 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;;  Advices
 ;;
 ;; ----------------------------------------------------------------------------
-
-(defadvice re-builder (around alien-search/re-builder/signal-switch-to-re-builder ())
-  "Signal `alien-search/.re-builder-called' to exit
-from  minibuffer.
-
-This advice will be enabled by `alien-search/query-replace'
-and `alien-search/occur'."
-  (ad-disable-advice 're-builder 'around 'alien-search/re-builder/signal-switch-to-re-builder)
-  (ad-activate 're-builder)
-  (let ((contents (alien-search/read-minibuf-contents)))
-    (when contents
-      (throw 'alien-search/.switch-to-re-builder
-             contents))))
 
 (defadvice re-builder (before alien-search/re-builder/re-builder ())
   (setq alien-search/re-builder/.cached-data nil))
