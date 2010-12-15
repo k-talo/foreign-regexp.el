@@ -1999,8 +1999,8 @@ more information."
     (setq isearch-lazy-highlight-last-string nil)
     (isearch-update)
     
-    (when (boundp 'no-message) ;; Suppress compiler warning.
-      ;; Suppress messages.
+    ;; Suppress messages.
+    (when (boundp 'no-message) ;; For compiler.
       (setq no-message t))))
 
 ;; ----------------------------------------------------------------------------
