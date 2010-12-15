@@ -2956,7 +2956,7 @@ to each search option changed hook."
       (cond
        ((and (eq menu-bar-last-search-type 'alien)
              alien-search/history)
-        (setq ad-return-valur
+        (setq ad-return-value
               (alien-search/non-incremental/search-forward (car alien-search/history))))
        (t
         ad-do-it)))
@@ -2968,7 +2968,7 @@ to each search option changed hook."
       (cond
        ((and (eq menu-bar-last-search-type 'alien)
              alien-search/history)
-        (setq ad-return-valur
+        (setq ad-return-value
               (alien-search/non-incremental/search-backward (car alien-search/history))))
        (t
         ad-do-it)))
