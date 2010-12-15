@@ -3122,6 +3122,8 @@ command and make transition to another one."
                                                     'before
                                                     'alien-search/read-with-initial-contents)
                                  (ad-activate 'read-from-minibuffer)))))))))
+                    (ad-disable-advice (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
+                    (ad-activate (quote ,targ-command))
                     
                     ;; When `alien-search/isearch' is turned on, advise another
                     ;; alien-search commands to exit `alien-search/isearch' and
