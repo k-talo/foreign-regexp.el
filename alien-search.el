@@ -1918,15 +1918,11 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
-  (unwind-protect
-      (progn
-        ;; Just for prompt message.
-        (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-        (ad-activate 'isearch-message-prefix)
-        
-        (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
-    (ad-disable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-    (ad-activate 'isearch-message-prefix)))
+  ;; Just for prompt message.
+  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+  (ad-activate 'isearch-message-prefix)
+  
+  (isearch-mode t (null not-regexp) nil (not no-recursive-edit)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1950,15 +1946,11 @@ more information."
   (add-hook 'isearch-mode-end-hook
             'alien-search/isearch/.isearch-mode-end-hook-fn)
   
-  (unwind-protect
-      (progn
-        ;; Just for prompt message.
-        (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-        (ad-activate 'isearch-message-prefix)
-        
-        (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
-    (ad-disable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
-    (ad-activate 'isearch-message-prefix)))
+  ;; Just for prompt message.
+  (ad-enable-advice 'isearch-message-prefix 'after 'alien-search/isearch/modify-prompt)
+  (ad-activate 'isearch-message-prefix)
+  
+  (isearch-mode nil (null not-regexp) nil (not no-recursive-edit)))
 
 
 ;; ----------------------------------------------------------------------------
