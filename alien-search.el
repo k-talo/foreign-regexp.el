@@ -154,10 +154,10 @@
 ;;
 ;; See also default external programs written in Ruby, defined as:
 ;;
-;;   `alien-search/replace/default-shell-script'
-;;   `alien-search/occur/default-shell-script'
-;;   `alien-search/isearch/default-shell-script'
-;;   `alien-search/quote-meta/default-shell-script'
+;;   `alien-search/replace/shell-script'
+;;   `alien-search/occur/shell-script'
+;;   `alien-search/isearch/shell-script'
+;;   `alien-search/quote-meta/shell-script'
 ;;
 ;;
 ;; WISH LIST
@@ -483,11 +483,11 @@ and `alien-search/re-builder/run-occur'."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/run-external-program prog-path default-shell-script body
+;;  (alien-search/run-external-program prog-path shell-script body
 ;;                                     pattern replacement &rest other-args)
 ;;                                                                   => RESULT
 ;; ----------------------------------------------------------------------------
-(defun alien-search/run-external-program (prog-path default-shell-script
+(defun alien-search/run-external-program (prog-path shell-script
                                                     body
                                                     pattern
                                                     replacement
@@ -506,7 +506,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
          (fn-program         (make-temp-name base))
          (prog-basename      (if prog-path
                                  (file-name-nondirectory prog-path)
-                               "default-shell-script"))
+                               "shell-script"))
          (proc-output-buf    (get-buffer-create " *alien-search*"))
          (cur-buf            (current-buffer))
          (orig-file-modes    (default-file-modes))
@@ -535,11 +535,11 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                     (insert replacement))))
             (set-default-file-modes orig-file-modes))
 
-          ;; Save default-shell-script to file when required.
+          ;; Save shell-script to file when required.
           (when (not prog-path)
             (with-temp-file fn-program
               (set-buffer-file-coding-system coding-sys-out)
-              (insert default-shell-script))
+              (insert shell-script))
             (set-file-modes fn-program #o0700)
             (setq prog-path fn-program))
           
@@ -846,7 +846,7 @@ This is a side effect free version of `ad-activate'."
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/replace/external-program nil
+(defvar alien-search/replace/external-program nil
   "Path of an external program to use to execute actual search operation.
 
 Seven arguments describe below will be passed to the program.
@@ -902,72 +902,12 @@ Seven arguments describe below will be passed to the program.
  7th: An extended regular expression flag.
       When the value of this flag is not empty string,
       the current search pattern(:see 3rd arg) should be
-      interpreted as extended regular expression."
-  :type 'string
-  :group 'alien-search)
+      interpreted as extended regular expression.")
 
-(defcustom alien-search/replace/default-shell-script
-  "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def escape_str_for_eval! (str)
-  str.gsub!(/\"/ ){'\\\\\"'}
-end
-
-def escape_ruby_str_for_emacs! (str)
-  str.gsub!(/\\\\/) {'\\\\\\\\'}
-  str.gsub!(/\"/ ) {'\\\\\"'}
-end
-
-def main ()
-  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p = ARGV
-  
-  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  str_rpl = open(fn_rpl, 'r:UTF-8') {|f| f.read}
-  
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  escape_str_for_eval!(str_rpl)
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  str_in.scan( pat ) do |m|
-    replacement = eval '\"' + str_rpl + '\"'
-    escape_ruby_str_for_emacs!(replacement)
-    
-    print '('
-    print Regexp.last_match.begin(0), ' '
-    print Regexp.last_match.end(0),   ' '
-    print '\"', replacement, '\"'
-    print ')'
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-  
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-"
+(defvar alien-search/replace/shell-script nil
   "A shell script which will be run as 
 `alien-search/replace/external-program'
-when it has nil value."
-  :type  'string
-  :group 'alien-search)
+when it has nil value.")
 
 
 (defvar alien-search/replace/defaults nil
@@ -1046,7 +986,7 @@ the list `alien-search/replace/ovs-on-match/data'."
   (let* ((offset (point-min))
          (result (alien-search/run-external-program
                   alien-search/replace/external-program
-                  alien-search/replace/default-shell-script
+                  alien-search/replace/shell-script
                   (buffer-substring (point-min) (point-max))
                   pattern
                   replacement
@@ -1515,7 +1455,7 @@ alien-search/replace/replacement."
 ;; XXX: `A dot matches newline flag' should be removed?
 ;;      (Is that flag nonsense thing? ...because `occur' is line
 ;;       oriented matching operation...)
-(defcustom alien-search/occur/external-program nil
+(defvar alien-search/occur/external-program nil
   "Path of an external program to use to execute actual search
 operation.
 
@@ -1572,69 +1512,12 @@ Six arguments describe below will be passed to the program.
  6th: An extended regular expression flag.
       When the value of this flag is not empty string,
       the current search pattern(:see 3rd arg) should be
-      interpreted as extended regular expression."
-  :type  'string
-  :group 'alien-search)
+      interpreted as extended regular expression.")
 
-(defcustom alien-search/occur/default-shell-script
-  "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p = ARGV
-  
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  offset = 0
-  
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  open(fn_in, 'r:UTF-8') do |file_in|
-    while line = file_in.gets do
-      matched = 0
-      len = line.length
-      line.chomp!
-      
-      line.scan( pat ) do
-        print '(' if matched == 0
-        print '('
-        print offset + Regexp.last_match.begin(0), ' '
-        print offset + Regexp.last_match.end(0)
-        print ')'
-        matched += 1
-      end
-      print ')' if matched != 0
-      
-      offset += len
-    end
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-  
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-"
+(defvar alien-search/occur/shell-script nil
   "A shell script which will be run as
 `alien-search/occur/external-program'
-when it has nil value."
-  :type  'string
-  :group 'alien-search)
+when it has nil value.")
 
 
 ;; ----------------------------------------------------------------------------
@@ -1709,7 +1592,7 @@ when it has nil value."
             (with-current-buffer buf
               (setq result (alien-search/run-external-program
                             alien-search/occur/external-program
-                            alien-search/occur/default-shell-script
+                            alien-search/occur/shell-script
                             (buffer-substring (point-min) (point-max))
                             regexp
                             nil
@@ -1827,7 +1710,7 @@ when it has nil value."
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/isearch/external-program nil
+(defvar alien-search/isearch/external-program nil
   "Path of an external program to use to execute actual search operation.
 
 Six arguments describe below will be passed to the program.
@@ -1875,56 +1758,12 @@ Six arguments describe below will be passed to the program.
  6th: An extended regular expression flag.
       When the value of this flag is not empty string,
       the current search pattern(:see 3rd arg) should be
-      interpreted as extended regular expression."
-  :type  'string
-  :group 'alien-search)
+      interpreted as extended regular expression.")
 
-(defcustom alien-search/isearch/default-shell-script
-  "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p = ARGV
-  
-  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  str_in.scan( pat ) do
-    print '('
-    print Regexp.last_match.begin(0), ' '
-    print Regexp.last_match.end(0)
-    print ')'
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-"
+(defvar alien-search/isearch/shell-script nil
   "A shell script which will be run as
 `alien-search/isearch/external-program'
-when it has nil value."
-  :type  'string
-  :group 'alien-search)
+when it has nil value.")
 
 
 (defvar alien-search/isearch/.cached-data nil
@@ -2109,7 +1948,7 @@ and `re-search-backward' while isearch by alien-search is on."
           (setq alien-search/isearch/.cached-data
                 (alien-search/run-external-program
                  alien-search/isearch/external-program
-                 alien-search/isearch/default-shell-script
+                 alien-search/isearch/shell-script
                  (buffer-substring pt-min pt-max)
                  regexp
                  nil
@@ -2176,7 +2015,7 @@ and `re-search-backward' while isearch by alien-search is on."
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/quote-meta/external-program nil
+(defvar alien-search/quote-meta/external-program nil
   "Path of an external program to use to execute actual
 quote-meta operation.
 
@@ -2198,47 +2037,12 @@ Two arguments describe below will be passed to the program.
       characters in it, is written.
 
       The text in this file is encoded in the value of
-      `alien-search/output-coding-system'."
-  :type 'string
-  :group 'alien-search)
+      `alien-search/output-coding-system'.")
 
-(defcustom alien-search/quote-meta/default-shell-script
-  "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def escape_ruby_str_for_emacs! (str)
-  str.gsub!(/\\\\/) {'\\\\\\\\'}
-  str.gsub!(/\"/ ) {'\\\\\"'}
-end
-
-def main ()
-  fn_out, fn_pat = ARGV
-  
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  retval = Regexp.escape(str_pat)
-  escape_ruby_str_for_emacs!(retval)
-  
-  print '(setq result \"'
-  print retval
-  print '\")'
-
-  exit 0
-end
-
-main
-
-# EOF
-"
+(defvar alien-search/quote-meta/shell-script nil
   "A shell script which will be run as
 `alien-search/quote-meta/external-program'
-when it has nil value."
-  :type 'string
-  :group 'alien-search)
+when it has nil value.")
 
 
 ;; ----------------------------------------------------------------------------
@@ -2255,7 +2059,7 @@ when it has nil value."
   (interactive)
   (alien-search/run-external-program
    alien-search/quote-meta/external-program
-   alien-search/quote-meta/default-shell-script
+   alien-search/quote-meta/shell-script
    nil ;; Don't care about text in current buffer.
    pattern
    nil))
@@ -2268,7 +2072,7 @@ when it has nil value."
 ;;; ===========================================================================
 (require 're-builder)
 
-(defcustom alien-search/re-builder/external-program nil
+(defvar alien-search/re-builder/external-program nil
   "Path of an external program to use to execute actual search operation.
 
 Seven arguments describe below will be passed to the program.
@@ -2325,63 +2129,12 @@ Seven arguments describe below will be passed to the program.
       interpreted as extended regular expression.
 
  7th: Positive integer when we want limit the matches, or empty
-      string when we don't want limit the matches."
-  :type  'string
-  :group 'alien-search)
+      string when we don't want limit the matches.")
 
-(defcustom alien-search/re-builder/default-shell-script
-  "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p, limit = ARGV
-  
-  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  limit = (Integer limit rescue nil)
-  count = 0
-  
-  str_in.scan( pat ) do
-    break unless (!limit || ((count += 1) <= limit))
-    
-    print '('
-    Regexp.last_match.length.times {|i|
-      print Regexp.last_match.begin(i), ' '
-      print Regexp.last_match.end(i),   ' '
-    }
-    print ')'
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-"
+(defvar alien-search/re-builder/shell-script nil
   "A shell script which will be run as
 `alien-search/re-builder/external-program'
-when it has nil value."
-  :type  'string
-  :group 'alien-search)
+when it has nil value.")
 
 (defvar alien-search/re-builder/.cached-data nil
   "Private variable.")
@@ -2805,7 +2558,7 @@ and `re-search-backward' by `re-builder'."
                     (with-current-buffer reb-target-buffer
                       (alien-search/run-external-program
                        alien-search/re-builder/external-program
-                       alien-search/re-builder/default-shell-script
+                       alien-search/re-builder/shell-script
                        (buffer-substring pt-min pt-max)
                        regexp
                        nil
