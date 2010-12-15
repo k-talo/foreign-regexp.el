@@ -322,8 +322,9 @@ See also the function `throw' for more info."
   (run-hooks 'alien-search/case-fold-changed-hook)
   
   (when (not no-message)
-    (minibuffer-message "[alien-search] case %ssensitive"
-                        (if case-fold-search "in" ""))))
+    (minibuffer-message
+     (format "[alien-search] case %ssensitive"
+             (if case-fold-search "in" "")))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/toggle-dot-match &optional no-message) => VOID
@@ -337,8 +338,9 @@ See also the function `throw' for more info."
   (run-hooks 'alien-search/dot-match-changed-hook)
   
   (when (not no-message)
-    (minibuffer-message "[alien-search] . %s newline"
-                        (if alien-search/dot-match-a-newline-p "matches" "does not match"))))
+    (minibuffer-message
+     (format "[alien-search] . %s newline"
+             (if alien-search/dot-match-a-newline-p "matches" "does not match")))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/toggle-ext-regexp &optional no-message) => VOID
@@ -352,8 +354,9 @@ See also the function `throw' for more info."
   (run-hooks 'alien-search/ext-regexp-changed-hook)
   
   (when (not no-message)
-    (minibuffer-message "[alien-search] %sextended regex"
-                        (if alien-search/use-extended-regexp-p "" "no "))))
+    (minibuffer-message
+     (format "[alien-search] %sextended regex"
+             (if alien-search/use-extended-regexp-p "" "no ")))))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -3038,9 +3041,9 @@ to each search option changed hook."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/transition/setup sym-table) => VOID
+;;  (alien-search/transition/.setup sym-table) => VOID
 ;; ----------------------------------------------------------------------------
-(defmacro alien-search/transition/setup (sym-table)
+(defmacro alien-search/transition/.setup (sym-table)
   "Define transitions among each command."
   (let ((retval (list 'progn)))
     (dolist (rec (symbol-value sym-table))
@@ -3346,10 +3349,24 @@ as the value of a tag."
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/transition/setup) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/transition/setup ()
+  (eval
+   '(alien-search/transition/.setup alien-search/transition/command-table)))
+
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Main
 ;;
 ;; ----------------------------------------------------------------------------
 
-(alien-search/transition/setup alien-search/transition/command-table)
+(alien-search/transition/setup)
 
 ;;; alien-search.el ends here
