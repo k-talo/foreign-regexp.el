@@ -1999,8 +1999,9 @@ more information."
     (setq isearch-lazy-highlight-last-string nil)
     (isearch-update)
     
-    ;; Suppress messages.
-    (setq no-message t)))
+    (when (boundp 'no-message) ;; Suppress compiler warning.
+      ;; Suppress messages.
+      (setq no-message t))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/setup-search-option-changed-hook) => VOID
