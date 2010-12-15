@@ -3088,11 +3088,6 @@ to each search option changed hook."
                       "Throw a tag so that we can exit current alien-search
 command and make transition to another one."
                       (lexical-let ((regexp isearch-string))
-                        (ad-disable-advice (quote ,targ-command)
-                                           'around
-                                           (quote ,ad-name-make-transition-to))
-                        (ad-activate (quote ,targ-command))
-                        
                         (isearch-exit)
                         
                         (run-with-idle-timer
@@ -3100,7 +3095,8 @@ command and make transition to another one."
                          (lambda ()
                            ,@(case targ-op-kind
                                ((re-builder-cmd)
-                                `((re-builder)
+                                `((let ((this-command (quote ,targ-command)))
+                                    (call-interactively (quote ,targ-command)))
                                   (with-current-buffer (get-buffer reb-buffer)
                                     (delete-region (point-min) (point-max))
                                     (insert regexp))))
@@ -3122,6 +3118,7 @@ command and make transition to another one."
                                                     'before
                                                     'alien-search/read-with-initial-contents)
                                  (ad-activate 'read-from-minibuffer)))))))))
+                    ;; Should be turned on by `isearch-mode-hook'.
                     (ad-disable-advice (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
                     (ad-activate (quote ,targ-command))
                     
@@ -3258,7 +3255,7 @@ when it is called."
                                               'around
                                               (quote ,ad-name-throw-transition-to))
                             (ad-activate (quote ,targ-command))
-                              
+                            
                             (alien-search/catch-case var
                                 ad-do-it
                               (,ad-name-throw-transition-to
@@ -3318,6 +3315,12 @@ make a transition to another one.
 
 Current contents of minibuffer will be thrown
 as the value of a tag."
+                      ;; NOTE-1: This advice will be enabled/disabled in
+                      ;;         advice when each alien-search command is run.
+                      ;;         And, when the flag `,g-transition-allowed-p' is
+                      ;;         nil, this advice behaves as if it was not there.
+                      ;; NOTE-2: `,g-transition-allowed-p' is assigned a different
+                      ;;         symbol for each alien-search commands.
                       (cond
                        ((and (boundp (quote ,g-transition-allowed-p))
                              ,g-transition-allowed-p)
