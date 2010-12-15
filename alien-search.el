@@ -2000,7 +2000,7 @@ more information."
     (isearch-update)
     
     ;; Suppress messages.
-    (when (boundp no-message) ;; For compiler.
+    (when (boundp 'no-message) ;; For compiler.
       (setq no-message t))))
 
 ;; ----------------------------------------------------------------------------
