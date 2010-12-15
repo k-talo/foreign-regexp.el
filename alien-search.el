@@ -3088,36 +3088,41 @@ to each search option changed hook."
                       "Throw a tag so that we can exit current alien-search
 command and make transition to another one."
                       (lexical-let ((regexp isearch-string))
-                        (isearch-exit)
-                        
-                        (run-with-idle-timer
-                         0 nil
-                         (lambda ()
-                           ,@(case targ-op-kind
-                               ((re-builder-cmd)
-                                `((let ((this-command (quote ,targ-command)))
-                                    (call-interactively (quote ,targ-command)))
-                                  (with-current-buffer (get-buffer reb-buffer)
-                                    (delete-region (point-min) (point-max))
-                                    (insert regexp))))
-                               ((minibuf-cmd)
-                                `(
-                                  ;; Set initial contents for `read-from-minibuffer',
-                                  ;; then call another alien-search command.
-                                  (unwind-protect
-                                      (progn
-                                        (ad-enable-advice 'read-from-minibuffer
-                                                          'before
-                                                          'alien-search/read-with-initial-contents)
-                                        (ad-activate 'read-from-minibuffer)
+                        (unwind-protect
+                            (isearch-exit)
+                          ;; `isearch-exit' throws something in some case,
+                          ;; so another alien-search command should be called
+                          ;; from within protected form.
+                          ,@(case targ-op-kind
+                              ((re-builder-cmd)
+                               ;; Do not run `re-builder' with timer,
+                               ;; or window won't switched to *RE-Builder*
+                               ;; properly.
+                               `((let ((this-command (quote ,targ-command)))
+                                   (call-interactively (quote ,targ-command)))
+                                 (with-current-buffer (get-buffer reb-buffer)
+                                   (delete-region (point-min) (point-max))
+                                   (insert regexp))))
+                              ((minibuf-cmd)
+                               `((run-with-idle-timer
+                                  0 nil
+                                  (lambda ()
+                                    ;; Set initial contents for `read-from-minibuffer',
+                                    ;; then call another alien-search command.
+                                    (unwind-protect
+                                        (progn
+                                          (ad-enable-advice 'read-from-minibuffer
+                                                            'before
+                                                            'alien-search/read-with-initial-contents)
+                                          (ad-activate 'read-from-minibuffer)
                                         
-                                     (let ((alien-search/.initial-contents regexp)
-                                           (this-command (quote ,targ-command)))
-                                       (call-interactively (quote ,targ-command))))
-                                 (ad-disable-advice 'read-from-minibuffer
-                                                    'before
-                                                    'alien-search/read-with-initial-contents)
-                                 (ad-activate 'read-from-minibuffer)))))))))
+                                          (let ((alien-search/.initial-contents regexp)
+                                                (this-command (quote ,targ-command)))
+                                            (call-interactively (quote ,targ-command))))
+                                      (ad-disable-advice 'read-from-minibuffer
+                                                         'before
+                                                         'alien-search/read-with-initial-contents)
+                                      (ad-activate 'read-from-minibuffer))))))))))
                     ;; Should be turned on by `isearch-mode-hook'.
                     (ad-disable-advice (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
                     (ad-activate (quote ,targ-command))
@@ -3262,18 +3267,21 @@ when it is called."
                                (lexical-let ((regexp (cadr var))
                                              (orig-messasge-fn
                                               (symbol-function 'message)))
-                                 (run-with-idle-timer
-                                  0 nil
-                                  (lambda ()
-                                    ,@(case targ-op-kind
-                                        ((re-builder-cmd)
-                                         `((let ((this-command (quote ,targ-command)))
-                                             (call-interactively (quote ,targ-command)))
-                                           (with-current-buffer (get-buffer reb-buffer)
-                                             (delete-region (point-min) (point-max))
-                                             (insert regexp))))
-                                        ((isearch-cmd)
-                                         `((add-hook 'isearch-mode-hook
+                                 ,@(case targ-op-kind
+                                     ((re-builder-cmd)
+                                      ;; Do not run `re-builder' with timer,
+                                      ;; or window won't switched to *RE-Builder*
+                                      ;; properly.
+                                      `((let ((this-command (quote ,targ-command)))
+                                          (call-interactively (quote ,targ-command)))
+                                        (with-current-buffer (get-buffer reb-buffer)
+                                          (delete-region (point-min) (point-max))
+                                          (insert regexp))))
+                                     ((isearch-cmd)
+                                      `((run-with-idle-timer
+                                         0 nil
+                                         (lambda ()
+                                           (add-hook 'isearch-mode-hook
                                                      (alien-search/alambda ()
                                                        (remove-hook 'isearch-mode-hook
                                                                     #'self)
@@ -3281,9 +3289,12 @@ when it is called."
                                                        (setq isearch-string  regexp
                                                              isearch-message regexp)))
                                            (let ((this-command (quote ,targ-command)))
-                                             (call-interactively (quote ,targ-command)))))
-                                        ((minibuf-cmd)
-                                         `((unwind-protect
+                                             (call-interactively (quote ,targ-command)))))))
+                                     ((minibuf-cmd)
+                                      `((run-with-idle-timer
+                                         0 nil
+                                         (lambda ()
+                                           (unwind-protect
                                                ;; Set initial contents for `read-from-minibuffer',
                                                ;; then call another alien-search command.
                                                (progn
