@@ -760,29 +760,34 @@ This is a side effect free version of `ad-activate'."
   (easy-menu-add-item menu-bar-search-menu
                       nil
                       ["Alien Regexp Forward..." alien-search/non-incremental/search-forward
+                       :active (alien-search/non-incremental/available-p)
                        :help "Search forward for an alien regular expression"]
                       "separator-repeat-search")
   (easy-menu-add-item menu-bar-search-menu
                       nil
                       ["Alien Regexp Backward..." alien-search/non-incremental/search-backward
+                       :active (alien-search/non-incremental/available-p)
                        :help "Search backward for an alien regular expression"]
                       "separator-repeat-search")
                     
   (easy-menu-add-item menu-bar-i-search-menu
                       nil
                       ["Forward Alien Regexp..." alien-search/isearch-forward
+                       :active (alien-search/isearch/available-p)
                        :help "Search forward for an alien regular expression as you type it"]
                       nil)
 
   (easy-menu-add-item menu-bar-i-search-menu
                       nil
                       ["Backward Alien Regexp..." alien-search/isearch-backward
+                       :active (alien-search/isearch/available-p)
                        :help "Search backwards for an alien regular expression as you type it"]
                       "separator-repeat-search")
 
   (easy-menu-add-item menu-bar-replace-menu
                       nil
                       ["Replace Alien Regexp..." alien-search/query-replace
+                       :active (alien-search/replace/available-p)
                        :help "Replace alien regular expression interactively, ask about each occurrence"]
                       "separator-replace-tags")
 
@@ -816,7 +821,8 @@ This is a side effect free version of `ad-activate'."
                                         regexp-search-ring)
                                    ;; For alien regexp search.
                                    (and (eq menu-bar-last-search-type 'alien)
-                                        alien-search/history))
+                                        alien-search/history
+                                        (alien-search/non-incremental/available-p)))
                 :help ,(purecopy "Repeat last search forward")))
   (define-key menu-bar-search-menu [repeat-search-back]
     `(menu-item ,(purecopy "Repeat Backwards") nonincremental-repeat-search-backward
@@ -826,7 +832,8 @@ This is a side effect free version of `ad-activate'."
                                         regexp-search-ring)
                                    ;; For alien regexp search.
                                    (and (eq menu-bar-last-search-type 'alien)
-                                        alien-search/history))
+                                        alien-search/history
+                                        (alien-search/non-incremental/available-p)))
                 :help ,(purecopy "Repeat last search backwards"))))
 
 
@@ -932,30 +939,33 @@ See also `query-replace-defaults'.")
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
   (interactive
-   (let ((common
-          (let ((query-replace-from-history-variable 'alien-search/history)
-                (query-replace-to-history-variable   'alien-search/history)
-                (query-replace-defaults              alien-search/replace/defaults))
-            (unwind-protect
-                (progn
+   (and
+    (alien-search/replace/assert-available)
+    (let ((common
+           (let ((query-replace-from-history-variable 'alien-search/history)
+                 (query-replace-to-history-variable   'alien-search/history)
+                 (query-replace-defaults              alien-search/replace/defaults))
+             (unwind-protect
+                 (progn
                   (alien-search/ad-enable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
                   (alien-search/ad-activate 'read-from-minibuffer)
                   
-                  (prog1 (query-replace-read-args
-                          (concat "Query replace alien regexp"
-                                  (if (and transient-mark-mode mark-active) " in region" ""))
-                          t)
-                    (setq alien-search/replace/defaults query-replace-defaults)))
-              (alien-search/ad-disable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-              (alien-search/ad-activate 'read-from-minibuffer)))))
-     (list (nth 0 common) (nth 1 common) (nth 2 common)
-           ;; These are done separately here
-           ;; so that command-history will record these expressions
-           ;; rather than the values they had this time.
-           (if (and transient-mark-mode mark-active)
-               (region-beginning))
-           (if (and transient-mark-mode mark-active)
-               (region-end)))))
+                   (prog1 (query-replace-read-args
+                           (concat "Query replace alien regexp"
+                                   (if (and transient-mark-mode mark-active) " in region" ""))
+                           t)
+                     (setq alien-search/replace/defaults query-replace-defaults)))
+               (alien-search/ad-disable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+               (alien-search/ad-activate 'read-from-minibuffer)))))
+      (list (nth 0 common) (nth 1 common) (nth 2 common)
+            ;; These are done separately here
+            ;; so that command-history will record these expressions
+            ;; rather than the values they had this time.
+            (if (and transient-mark-mode mark-active)
+                (region-beginning))
+            (if (and transient-mark-mode mark-active)
+                (region-end))))))
+  (alien-search/replace/assert-available)
   (alien-search/replace/perform-replace
    pattern replacement t nil nil nil nil start end))
 
@@ -965,6 +975,22 @@ more information."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/replace/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/replace/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/replace/external-program
+      alien-search/replace/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/replace/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/replace/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/replace/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/search-by-external-program pattern replacement)
@@ -1530,16 +1556,20 @@ when it has nil value.")
 ;;  (alien-search/occur regexp &optional nlines) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/occur (regexp &optional nlines)
-  (interactive (let ((regexp-history alien-search/history))
-                 (unwind-protect
-                     (progn
-                       (alien-search/ad-enable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-                       (alien-search/ad-activate 'read-from-minibuffer)
-                       (prog1
-                           (alien-search/occur-read-primary-args)
-                         (setq alien-search/history regexp-history)))
-                   (alien-search/ad-disable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
-                   (alien-search/ad-activate 'read-from-minibuffer))))
+  (interactive
+   (and
+    (alien-search/occur/assert-available)
+    (let ((regexp-history alien-search/history))
+      (unwind-protect
+          (progn
+            (alien-search/ad-enable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+            (alien-search/ad-activate 'read-from-minibuffer)
+            (prog1
+                (alien-search/occur-read-primary-args)
+              (setq alien-search/history regexp-history)))
+        (alien-search/ad-disable 'read-from-minibuffer 'around 'alien-search/with-search-option-indicator)
+        (alien-search/ad-activate 'read-from-minibuffer)))))
+  (alien-search/occur/assert-available)
   (let ((orig-occur-engine-fn (symbol-function 'occur-engine)))
     (setf (symbol-function 'occur-engine)
           (symbol-function 'alien-search/occur/occur-engine))
@@ -1554,6 +1584,22 @@ when it has nil value.")
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/occur/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/occur/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/occur/external-program
+      alien-search/occur/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/occur/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/occur/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/occur/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/occur-read-primary-args) => LIST
@@ -1788,6 +1834,8 @@ when it has nil value.")
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
   (interactive "P\np")
+  (alien-search/isearch/assert-available)
+  
   (setq alien-search/isearch/.cached-data nil)
   (setq alien-search/isearch/.last-regexp nil)
   
@@ -1816,6 +1864,8 @@ more information."
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
   (interactive "P\np")
+  (alien-search/isearch/assert-available)
+  
   (setq alien-search/isearch/.cached-data nil)
   (setq alien-search/isearch/.last-regexp nil)
   
@@ -1866,6 +1916,22 @@ more information."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/isearch/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/isearch/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/isearch/external-program
+      alien-search/isearch/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/isearch/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/isearch/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/isearch/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/search-option-changed-hook-fn) => VOID
@@ -2052,11 +2118,29 @@ when it has nil value.")
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
+;;  (alien-search/quote-meta/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/quote-meta/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/quote-meta/external-program
+      alien-search/quote-meta/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/quote-meta/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/quote-meta/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/quote-meta/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
+
+;; ----------------------------------------------------------------------------
 ;;  (alien-search/quote-meta pattern) => VOID
 ;; ----------------------------------------------------------------------------
 (defun alien-search/quote-meta (pattern)
   "Quote meta characters in a PATTERN in manner of external program."
   (interactive)
+  (alien-search/quote-meta/assert-available)
+  
   (alien-search/run-external-program
    alien-search/quote-meta/external-program
    alien-search/quote-meta/shell-script
@@ -2207,15 +2291,20 @@ and then run BODY with binding current RE to RE-VAR.
 
 NOTE: RE-VAR will be defined as lexical variable by this macro."
   (declare (indent 1))
-  `(lexical-let ((,re-var (and (eq (get-buffer reb-buffer)
-                                   (current-buffer))
-                               (with-current-buffer (get-buffer reb-buffer)
-                                 (buffer-substring (point-min) (point-max))))))
-     (when ,re-var
-       (reb-quit)
-       (kill-buffer (get-buffer reb-buffer))
-       (set-buffer reb-target-buffer)
-       ,@body)))
+  `(progn
+     (case reb-re-syntax
+       ((alien)
+        (lexical-let ((,re-var (and (eq (get-buffer reb-buffer)
+                                        (current-buffer))
+                                    (with-current-buffer (get-buffer reb-buffer)
+                                      (buffer-substring (point-min) (point-max))))))
+          (when ,re-var
+            (reb-quit)
+            (kill-buffer (get-buffer reb-buffer))
+            (set-buffer reb-target-buffer)
+            ,@body)))
+       (t
+        (error "[alien-search] RE-Builder syntax is not `alien'.")))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -2230,6 +2319,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-query-replace ()
   "Run `alien-search/query-replace' with current RE."
   (interactive)
+  (alien-search/replace/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (when (match-beginning 0)
       (goto-char (match-beginning 0)))
@@ -2252,6 +2343,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-occur ()
   "Run `alien-search/occur' with current RE."
   (interactive)
+  (alien-search/occur/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (unwind-protect
         (progn
@@ -2271,6 +2364,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-isearch-forward ()
   "Run `alien-search/isearch-forward' with current RE."
   (interactive)
+  (alien-search/isearch/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (add-hook 'isearch-mode-hook
               (alien-search/alambda ()
@@ -2287,6 +2382,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-isearch-backward ()
   "Run `alien-search/isearch-backward' with current RE."
   (interactive)
+  (alien-search/isearch/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (add-hook 'isearch-mode-hook
               (alien-search/alambda ()
@@ -2303,6 +2400,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-non-incremental-search-forward ()
   "Run `alien-search/non-incremental/search-forward' with current RE."
   (interactive)
+  (alien-search/non-incremental/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (alien-search/non-incremental/search-forward regexp)))
 
@@ -2312,6 +2411,8 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/run-non-incremental-search-backward ()
   "Run `alien-search/non-incremental/search-backward' with current RE."
   (interactive)
+  (alien-search/non-incremental/assert-available)
+  
   (alien-search/re-builder/exec-with-current-re regexp
     (alien-search/non-incremental/search-forward regexp)))
 
@@ -2371,6 +2472,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defadvice reb-next-match (around alien-search/re-builder/ext-match ())
   (case reb-re-syntax
     ((alien)
+     (alien-search/re-builder/assert-available)
      (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
                                                  'alien-search/re-builder/search-fun
                                                  :re-search-backward-fn
@@ -2387,6 +2489,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defadvice reb-prev-match (around alien-search/re-builder/prev-match ())
   (case reb-re-syntax
     ((alien)
+     (alien-search/re-builder/assert-available)
      (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
                                                  'alien-search/re-builder/search-fun
                                                  :re-search-backward-fn
@@ -2403,6 +2506,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defadvice reb-copy (around alien-search/re-builder/copy ())
   (case reb-re-syntax
    ((alien)
+    (alien-search/re-builder/assert-available)
     (kill-new (buffer-substring-no-properties (point-min) (point-max))))
    (t ad-do-it)))
 (alien-search/ad-activate 'reb-copy)
@@ -2459,6 +2563,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defadvice reb-count-subexps (around alien-search/re-builder/count-subexps (re))
   (case reb-re-syntax
    ((alien)
+    (alien-search/re-builder/assert-available)
     (let ((retval 0))
       ;; Update `alien-search/re-builder/.cached-data'.
       (alien-search/re-builder/search-fun (reb-target-binding reb-regexp) (point-max))
@@ -2473,6 +2578,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
   (case reb-re-syntax
     ((alien)
      (setq alien-search/re-builder/.cached-data nil)
+     (alien-search/re-builder/assert-available)
      (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
                                                  'alien-search/re-builder/search-fun
                                                  :re-search-backward-fn
@@ -2491,6 +2597,22 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/re-builder/external-program
+      alien-search/re-builder/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/re-builder/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/get-current-regexp) => STRING or NIL
@@ -2707,9 +2829,13 @@ to each search option changed hook."
 ;; From menu-bar.el
 (defun alien-search/non-incremental/search-forward (string)
   "Read a regular expression and search for it nonincrementally."
-  (interactive (list (read-from-minibuffer "Search for alien regexp: "
-                                           nil nil nil
-                                           'alien-search/history)))
+  (interactive
+   (and
+    (alien-search/non-incremental/assert-available)
+    (list (read-from-minibuffer "Search for alien regexp: "
+                                nil nil nil
+                                'alien-search/history))))
+  (alien-search/non-incremental/assert-available)
   (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
         (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
         (isearch-forward t))
@@ -2728,9 +2854,12 @@ to each search option changed hook."
 ;; From menu-bar.el
 (defun alien-search/non-incremental/search-backward (string)
   "Read a regular expression and search for it backward nonincrementally."
-  (interactive (list (read-from-minibuffer "Search for alien regexp: "
-                                           nil nil nil
-                                           'alien-search/history)))
+  (interactive
+   (and
+    (alien-search/non-incremental/assert-available)
+    (list (read-from-minibuffer "Search for alien regexp: "
+                               nil nil nil
+                               'alien-search/history))))
   (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
         (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
         (isearch-forward nil))
@@ -2781,6 +2910,22 @@ to each search option changed hook."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/non-incremental/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/non-incremental/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/isearch/external-program
+      alien-search/isearch/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/non-incremental/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/non-incremental/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/non-incremental/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/non-incremental/.clear-cache) => VOID
@@ -2901,11 +3046,15 @@ transition to another alien-search command."
                                ;; NOTE: Do not run `re-builder' with timer,
                                ;;       or window won't be switched to
                                ;;       *RE-Builder* properly.
-                               `((let ((this-command (quote ,targ-command)))
-                                   (call-interactively (quote ,targ-command)))
-                                 (with-current-buffer (get-buffer reb-buffer)
-                                   (delete-region (point-min) (point-max))
-                                   (insert regexp))))
+                               `((case reb-re-syntax
+                                   ((alien)
+                                    ((let ((this-command (quote ,targ-command)))
+                                       (call-interactively (quote ,targ-command)))
+                                     (with-current-buffer (get-buffer reb-buffer)
+                                       (delete-region (point-min) (point-max))
+                                       (insert regexp)))
+                                    (t
+                                     (error "[alien-search] RE-Builder syntax is not `alien'."))))))
                               ((minibuf-cmd)
                                `((run-with-idle-timer
                                   0 nil
@@ -3051,11 +3200,15 @@ while this function is running."
                                       ;; NOTE: Do not run `re-builder' with timer,
                                       ;;       or window won't be switched to
                                       ;;       *RE-Builder* properly.
-                                      `((let ((this-command (quote ,targ-command)))
-                                          (call-interactively (quote ,targ-command)))
-                                        (with-current-buffer (get-buffer reb-buffer)
-                                          (delete-region (point-min) (point-max))
-                                          (insert regexp))))
+                                      `((case reb-re-syntax
+                                          ((alien)
+                                           ((let ((this-command (quote ,targ-command)))
+                                              (call-interactively (quote ,targ-command)))
+                                            (with-current-buffer (get-buffer reb-buffer)
+                                              (delete-region (point-min) (point-max))
+                                              (insert regexp)))
+                                           (t
+                                            (error "[alien-search] RE-Builder syntax is not `alien'."))))))
                                      ((isearch-cmd)
                                       `((run-with-idle-timer
                                          0 nil
