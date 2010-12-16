@@ -3149,7 +3149,7 @@ transition to another alien-search command."
               ((minibuf-cmd)
                (let ((orig-command                (intern
                                                    (format
-                                                    "alien-search/transition/orig-%s"
+                                                    "ad-Orig-%s"
                                                     command)))
                      (ad-name-catch-transition-to (intern
                                                    (format
@@ -3184,32 +3184,26 @@ transition to another alien-search command."
                  ;;   2. Remember running alien-search command to
                  ;;      prevent duplicated calls while minibuffer
                  ;;      is active.
-                 (when (not (fboundp orig-command))
-                   (setf (symbol-function orig-command) (symbol-function command))
-                   ;; FIXME: Update `orig-command' when it is redefined.
-                   ;;
-                   (lexical-let ((orig-command orig-command)
-                                 (fn-label command))
-                     (eval `(progn
-                              (defadvice ,command (around alien-search/orig-fn (&rest args))
-                                (interactive)
-                                "A wrapper of original command to run advices before
+                 (eval `(progn
+                          (defadvice ,command (around alien-search/orig-fn (&rest args))
+                            (interactive)
+                            "A wrapper of original command to run advices before
 interactive form is run.
 And remember running command to prevent duplicate calls."
-                                (if (eq this-command
-                                        (quote ,command))
-                                    ;; Called interactively.
-                                    (unwind-protect
-                                        (progn
-                                          ;; Remember current command to
-                                          ;; prevent duplicate calls.
-                                          (setq alien-search/transition/.running-cmd this-command)
+                            (if (eq this-command
+                                    (quote ,command))
+                                ;; Called interactively.
+                                (unwind-protect
+                                    (progn
+                                      ;; Remember current command to
+                                      ;; prevent duplicate calls.
+                                      (setq alien-search/transition/.running-cmd this-command)
                                           
-                                          (call-interactively (quote ,orig-command)))
-                                      (setq alien-search/transition/.running-cmd nil))
-                                  ;; Called non-interactively.
-                                  (apply (quote ,orig-command) args)))
-                              (ad-activate (quote ,command))))))
+                                      (call-interactively (quote ,orig-command)))
+                                  (setq alien-search/transition/.running-cmd nil))
+                              ;; Called non-interactively.
+                              (apply (quote ,orig-command) args)))
+                          (ad-activate (quote ,command))))
                  (nconc
                   retval
                   `(
