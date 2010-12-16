@@ -33,6 +33,8 @@ sub main () {
                    ($dot_p  ? "s" : "") .
                    ($case_p ? "i" : "") .
                    ($ext_p  ? "x" : ""));
+    die $EVAL_ERROR if $EVAL_ERROR;
+    
     {
         local $INPUT_RECORD_SEPARATOR = "\n";
         my $fh_in  = FileHandle->new($fn_in, "<:encoding($code)");

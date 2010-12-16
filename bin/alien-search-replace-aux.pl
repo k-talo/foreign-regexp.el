@@ -72,6 +72,7 @@ sub main () {
                    ($dot_p  ? "s" : "") .
                    ($case_p ? "i" : "") .
                    ($ext_p  ? "x" : ""));
+    die $EVAL_ERROR if $EVAL_ERROR;
     
     escape_str_to_eval(\$str_repl);
     my $build_replacement_fn = generate_build_replacement_fn($str_repl);

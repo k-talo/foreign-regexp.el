@@ -34,6 +34,7 @@ sub main () {
                    ($dot_p  ? "s" : "") .
                    ($case_p ? "i" : "") .
                    ($ext_p  ? "x" : ""));
+    die $EVAL_ERROR if $EVAL_ERROR;
     
     {
         my $fh_out = FileHandle->new($fn_out, ">:encoding($code)");
