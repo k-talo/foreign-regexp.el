@@ -317,6 +317,7 @@ See also the function `throw' for more info."
   (run-hooks 'alien-search/case-fold-will-change-hook)
   (cond
    (isearch-mode
+    ;; FIXME: Turn off an annoying message.
     (isearch-toggle-case-fold)
     (setq case-fold-search isearch-case-fold-search))
    (t
