@@ -315,10 +315,13 @@ See also the function `throw' for more info."
   (interactive)
   
   (run-hooks 'alien-search/case-fold-will-change-hook)
-  (setq case-fold-search
-        (not case-fold-search))
-  (when isearch-mode
-    (setq isearch-case-fold-search case-fold-search))
+  (cond
+   (isearch-mode
+    (isearch-toggle-case-fold)
+    (setq case-fold-search isearch-case-fold-search))
+   (t
+    (setq case-fold-search
+          (not case-fold-search))))
   (run-hooks 'alien-search/case-fold-changed-hook)
   
   (when (not no-message)
@@ -753,7 +756,9 @@ current cursor position in minibuffer."
                       nil
                       '("Alien Search Options"
                         ["Case Insensitive" alien-search/toggle-case-fold
-                         :style radio :selected case-fold-search]
+                         :style radio :selected (if isearch-mode
+                                                    isearch-case-fold-search
+                                                  case-fold-search)]
                         [". Matches a Newline" alien-search/toggle-dot-match
                          :style radio :selected alien-search/dot-match-a-newline-p]
                         ["Extended Regular Expression" alien-search/toggle-ext-regexp
