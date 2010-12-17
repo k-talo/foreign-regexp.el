@@ -30,7 +30,7 @@ sub main () {
         $str_pat  = FileHandle->new($fn_pat, "<:encoding($code)")->getline;
     }
     
-    my $pat = eval("qr/${str_pat}/om" .
+    my $pat = eval("qr/\${str_pat}/om" .
                    ($dot_p  ? "s" : "") .
                    ($case_p ? "i" : "") .
                    ($ext_p  ? "x" : ""));
