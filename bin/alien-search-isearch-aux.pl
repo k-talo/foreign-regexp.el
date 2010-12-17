@@ -30,9 +30,9 @@ sub main () {
     }
     
     my $pat = eval("qr/\${str_pat}/om" .
-                   ($dot_p  ? "s" : "") .
-                   ($case_p ? "i" : "") .
-                   ($ext_p  ? "x" : ""));
+                   ( $dot_p  ? "s" : "") .
+                   (!$case_p ? "i" : "") .
+                   ( $ext_p  ? "x" : ""));
     die $EVAL_ERROR if $EVAL_ERROR;
     
     {

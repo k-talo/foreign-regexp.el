@@ -69,9 +69,9 @@ sub main () {
         $str_repl = FileHandle->new($fn_repl, "<:encoding($code)")->getline;
     }
     my $pat = eval("qr/\${str_pat}/om" .
-                   ($dot_p  ? "s" : "") .
-                   ($case_p ? "i" : "") .
-                   ($ext_p  ? "x" : ""));
+                   ( $dot_p  ? "s" : "") .
+                   (!$case_p ? "i" : "") .
+                   ( $ext_p  ? "x" : ""));
     die $EVAL_ERROR if $EVAL_ERROR;
     
     escape_str_to_eval(\$str_repl);
