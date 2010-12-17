@@ -182,7 +182,7 @@
 
 ;;; ===========================================================================
 ;;;
-;;;  Common variable and functions to each `alien-search' operation.
+;;;  Variables and functions common to each `alien-search' operation.
 ;;;
 ;;; ===========================================================================
 
@@ -610,7 +610,7 @@ current cursor position in minibuffer."
 
 ;;; ===========================================================================
 ;;;
-;;;  Search option indicator
+;;;  A "Search Option" indicator.
 ;;;
 ;;; ===========================================================================
 
@@ -705,7 +705,7 @@ current cursor position in minibuffer."
 
 ;;; ===========================================================================
 ;;;
-;;;  Menus
+;;;  Menu Definition.
 ;;;
 ;;; ===========================================================================
 
@@ -1384,7 +1384,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
 
 ;;; ===========================================================================
 ;;;
-;;;  Overlay on current match.
+;;;  An overlay on current match.
 ;;;
 ;;; ===========================================================================
 
@@ -1417,7 +1417,7 @@ Put overlay on current match."
 
 ;;; ===========================================================================
 ;;;
-;;;  Overlays on all of matches by external program.
+;;;  Overlays on all of matches.
 ;;;
 ;;; ===========================================================================
 
@@ -3000,7 +3000,7 @@ to each search option changed hook."
 
 ;;; ===========================================================================
 ;;;
-;;;  Transition among alien-search commands.
+;;;  The definition of transition between each command.
 ;;;
 ;;; ===========================================================================
 
