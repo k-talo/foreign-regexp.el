@@ -2915,6 +2915,9 @@ to each search option changed hook."
 ;;
 ;; ----------------------------------------------------------------------------
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/non-incremental/search-forward string) => POINT
+;; ----------------------------------------------------------------------------
 ;; From menu-bar.el
 (defun alien-search/non-incremental/search-forward (string)
   "Read a regular expression and search for it nonincrementally."
@@ -2924,14 +2927,18 @@ to each search option changed hook."
   (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
         (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
         (isearch-forward t))
-    (alien-search/isearch/search-fun string)
-    (setq menu-bar-last-search-type 'alien)
-    
-    (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
-    (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
-    (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+    (prog1
+        (alien-search/isearch/search-fun string)
+      (setq menu-bar-last-search-type 'alien)
+      
+      (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
+      (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
+      (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache))))
 (put 'alien-search/non-incremental/search-forward  'alien-search/nonincremental-command-p t)
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/non-incremental/search-backward string) => POINT
+;; ----------------------------------------------------------------------------
 ;; From menu-bar.el
 (defun alien-search/non-incremental/search-backward (string)
   "Read a regular expression and search for it backward nonincrementally."
@@ -2941,12 +2948,13 @@ to each search option changed hook."
   (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
         (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
         (isearch-forward nil))
-    (alien-search/isearch/search-fun string)
-    (setq menu-bar-last-search-type 'alien)
-    
-    (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
-    (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
-    (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+    (prog1
+        (alien-search/isearch/search-fun string)
+      (setq menu-bar-last-search-type 'alien)
+      
+      (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
+      (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
+      (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache))))
 (put 'alien-search/non-incremental/search-backward 'alien-search/nonincremental-command-p t)
 
 
