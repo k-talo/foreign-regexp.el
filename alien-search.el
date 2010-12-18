@@ -3204,11 +3204,13 @@ And remember running command to prevent duplicate calls."
                                       ;; Remember current command to
                                       ;; prevent duplicate calls.
                                       (setq alien-search/transition/.running-cmd this-command)
-                                          
-                                      (call-interactively (quote ,orig-command)))
+                                      
+                                      (setq ad-return-value
+                                            (call-interactively (quote ,orig-command))))
                                   (setq alien-search/transition/.running-cmd nil))
                               ;; Called non-interactively.
-                              (apply (quote ,orig-command) args)))
+                              (setq ad-return-value
+                                    (apply (quote ,orig-command) args))))
                           (ad-activate (quote ,command))))
                  (nconc
                   retval
