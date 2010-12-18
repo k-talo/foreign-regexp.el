@@ -794,6 +794,10 @@ This is a side effect free version of `ad-activate'."
   (easy-menu-add-item menu-bar-edit-menu
                       nil
                       '("Alien Search Options"
+                        ("Alien Type"
+                         :filter (lambda (&rest args)
+                                   (alien-search/menu/alien-type-menu-gen)))
+                        ("--")
                         ["Case Insensitive" alien-search/toggle-case-fold
                          :style radio :selected (if isearch-mode
                                                     isearch-case-fold-search
@@ -835,6 +839,35 @@ This is a side effect free version of `ad-activate'."
                                         alien-search/history
                                         (alien-search/non-incremental/available-p)))
                 :help ,(purecopy "Repeat last search backwards"))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/menu/alien-type-menu-gen &rest args) => MENU ITEMS
+;; ----------------------------------------------------------------------------
+(defun alien-search/menu/alien-type-menu-gen (&rest args)
+  ""
+  (mapcar (lambda (pair)
+            (let ((kv-lst (cdr pair)))
+              (vector
+               ;; NAME
+               (concat (cadr (memq :tag kv-lst)) "")
+               ;; CALLBACK
+               `(lambda (&rest args)
+                  (interactive)
+                  (alien-search/alien-type/set (quote ,(cadr (memq :name kv-lst))))) 
+               :style 'radio
+               :selected (eq (and (boundp 'alien-search/alien-type) ;; For compiler
+                                  alien-search/alien-type)
+                             (cadr (memq :name kv-lst)))
+               :active   t
+               :help "dummy")))
+          `((nil :name nil :tag "None")
+            ,@(let ((alst (copy-list
+                           (and (boundp 'alien-search/alien-type/.type-alst) ;; For compiler
+                                alien-search/alien-type/.type-alst))))
+                (sort alst
+                      (lambda (pair1 pair2)
+                        (string< (format "%s" (car pair1))
+                                 (format "%s" (car pair2)))))))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -3298,5 +3331,303 @@ as the value of a tag."
 ;; ----------------------------------------------------------------------------
 
 (alien-search/transition/setup)
+
+
+;;; ===========================================================================
+;;;
+;;;  Variables and Functions for managing "Alien Types".
+;;;
+;;; ===========================================================================
+
+(defcustom alien-search/alien-type nil
+  "\"Type of the alien regular expression\" that you want to use for alien search."
+  :type    'alien-search/alien-type/custom-widget/alien-type-selector
+  :group   'alien-search
+  :set     '(lambda (sym val)
+              (cond
+               ((fboundp 'alien-search/alien-type/set)
+                (alien-search/alien-type/set val))
+               (t
+                ;; When this file is being loaded,
+                ;; `alien-search/alien-type/set' will be called
+                ;; from `Main' section by timer.
+                (setq alien-search/alien-type val)))))
+
+(defvar alien-search/alien-type/.type-alst nil
+  ;; FIXME: Write document.
+  "Private variable.")
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/alien-type/define &key name
+;;                                       tag
+;;                                       input-coding-system
+;;                                       output-coding-system
+;;                                       indicator-case-fold
+;;                                       indicator-no-case-fold
+;;                                       indicator-ext-regexp
+;;                                       indicator-no-ext-regex
+;;                                       indicator-dot-match
+;;                                       indicator-no-dot-match
+;;                                       indicator-separator
+;;                                       cmd-path-replace
+;;                                       cmd-path-occur
+;;                                       cmd-path-isearch
+;;                                       cmd-path-quote-meta
+;;                                       cmd-path-re-builder
+;;                                       script-replace
+;;                                       script-occur
+;;                                       script-isearch
+;;                                       script-quote-meta
+;;                                       script-re-builder) => VOID
+;; ----------------------------------------------------------------------------
+(defun* alien-search/alien-type/define (&key name
+                                             tag
+                                             input-coding-system
+                                             output-coding-system
+                                             indicator-case-fold
+                                             indicator-no-case-fold
+                                             indicator-ext-regexp
+                                             indicator-no-ext-regex
+                                             indicator-dot-match
+                                             indicator-no-dot-match
+                                             indicator-separator
+                                             script-replace
+                                             script-occur
+                                             script-isearch
+                                             script-quote-meta
+                                             script-re-builder
+                                             cmd-path-replace
+                                             cmd-path-occur
+                                             cmd-path-isearch
+                                             cmd-path-quote-meta
+                                             cmd-path-re-builder)
+  ;; FIXME: Write document.
+  "Define an Alien Type.
+
+Arguments are:
+
+  NAME:
+        Name of an Aline Type. This must be a symbol.
+
+  TAG:
+        Name of an Alien Type by human-friendly representation.
+        TAG will be used as label string of menu item and custom
+        widget. This must be a string.
+
+  INPUT-CODING-SYSTEM:
+        See `alien-search/input-coding-system'.
+
+  OUTPUT-CODING-SYSTEM:
+        See `alien-search/output-coding-system'.
+      
+  INDICATOR-CASE-FOLD:
+        See `alien-search/search-option-indicator/case-fold-str'.
+      
+  INDICATOR-NO-CASE-FOLD:
+        See `alien-search/search-option-indicator/no-case-fold-str'.
+      
+  INDICATOR-DOT-MATCH:
+        See `alien-search/search-option-indicator/dot-match-str'.
+      
+  INDICATOR-NO-DOT-MATCH:
+        See `alien-search/search-option-indicator/no-dot-match-str'.
+      
+  INDICATOR-EXT-REGEXP:
+        See `alien-search/search-option-indicator/ext-regexp-str'.
+      
+  INDICATOR-NO-EXT-REGEX:
+        See `alien-search/search-option-indicator/no-ext-regex-str'.
+      
+  INDICATOR-SEPARATOR:
+        See `alien-search/search-option-indicator/separator-str'.
+      
+  CMD-PATH-REPLACE:
+        See `alien-search/replace/external-program'.
+
+  CMD-PATH-OCCUR:
+        See `alien-search/occur/external-program'.
+
+  CMD-PATH-ISEARCH:
+        See `alien-search/isearch/external-program'.
+
+  CMD-PATH-QUOTE-META:
+        See `alien-search/quote-meta/external-program'.
+
+  CMD-PATH-RE-BUILDER:
+        See `alien-search/re-builder/external-program'.
+
+  SCRIPT-REPLACE:
+        See `alien-search/replace/shell-script'.
+
+  SCRIPT-OCCUR:
+        See `alien-search/occur/shell-script'.
+      
+  SCRIPT-ISEARCH:
+        See `alien-search/isearch/shell-script'.
+      
+  SCRIPT-QUOTE-META:
+        See `alien-search/quote-meta/shell-script'.
+      
+  SCRIPT-RE-BUILDER:
+        See `alien-search/re-builder/shell-script'."
+  ;; Validation
+  ;;
+  (or name                   (error "[alien-search] No `:name'!"))
+  (or tag                    (error "[alien-search] No `:tag'!"))
+  (or input-coding-system    (error "[alien-search] No `:input-coding-system'!"))
+  (or output-coding-system   (error "[alien-search] No `:output-coding-system'!"))
+  (or indicator-case-fold    (error "[alien-search] No `:indicator-case-fold'!"))
+  (or indicator-no-case-fold (error "[alien-search] No `:indicator-no-case-fold'!"))
+  (or indicator-ext-regexp   (error "[alien-search] No `:indicator-ext-regexp'!"))
+  (or indicator-no-ext-regex (error "[alien-search] No `:indicator-no-ext-regex'!"))
+  (or indicator-dot-match    (error "[alien-search] No `:indicator-dot-match'!"))
+  (or indicator-no-dot-match (error "[alien-search] No `:indicator-no-dot-match'!"))
+  (or indicator-separator    (error "[alien-search] No `:indicator-separator'!"))
+
+  (or script-replace
+      cmd-path-replace
+      (error "[alien-search] No `:script-replace' or `:cmd-path-replace'!"))
+  (or script-occur
+      cmd-path-occur
+      (error "[alien-search] No `:script-occur' or `:cmd-path-occur'!"))
+  (or script-isearch
+      cmd-path-isearch
+      (error "[alien-search] No `:cmd-path-isearch' or `:cmd-path-isearch'!"))
+  (or script-quote-meta
+      cmd-path-quote-meta
+      (error "[alien-search] No `:script-quote-meta' or `:cmd-path-quote-meta'!"))
+  (or script-quote-meta
+      cmd-path-quote-meta
+      (error "[alien-search] No `:script-quote-meta' or `:cmd-path-quote-meta'!"))
+  (or script-re-builder
+      cmd-path-re-builder
+      (error "[alien-search] No `:script-re-builder' or `:cmd-path-re-builder'!"))
+
+  (alien-search/alien-type/forget name)
+  (push (list name
+              :name                    name
+              :tag                     tag
+              :input-coding-system     input-coding-system
+              :output-coding-system    output-coding-system
+              :indicator-case-fold     indicator-case-fold
+              :indicator-no-case-fold  indicator-no-case-fold
+              :indicator-ext-regexp    indicator-ext-regexp
+              :indicator-no-ext-regex  indicator-no-ext-regex
+              :indicator-dot-match     indicator-dot-match
+              :indicator-no-dot-match  indicator-no-dot-match
+              :indicator-separator     indicator-separator
+              :script-replace          script-replace
+              :script-occur            script-occur
+              :script-isearch          script-isearch
+              :script-quote-meta       script-quote-meta
+              :script-re-builder       script-re-builder
+              :cmd-path-replace        cmd-path-replace
+              :cmd-path-occur          cmd-path-occur
+              :cmd-path-isearch        cmd-path-isearch
+              :cmd-path-quote-meta     cmd-path-quote-meta
+              :cmd-path-re-builder     cmd-path-re-builder)
+        alien-search/alien-type/.type-alst)
+
+  (alien-search/alien-type/custom-widget/alien-type-selector/update))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/alien-type/forget NAME) => ALIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/alien-type/forget (name)
+  "Remove an alien type NAME from `alien-search/alien-type/.type-alst'."
+  (setq alien-search/alien-type/.type-alst
+        (remove-if '(lambda (pair) (eq name (car pair)))
+                   alien-search/alien-type/.type-alst)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/alien-type/set NAME) => VOID
+;; ----------------------------------------------------------------------------
+(defvar alien-search/alien-type/.history nil
+  "History list for a command `alien-search/alien-type/set'.")
+
+(defun alien-search/alien-type/set (name)
+  "Activate alien type NAME."
+  (interactive
+   (list
+    (intern
+     (completing-read
+      (format "Alien regexp type for alien search (defalut %s): "
+              alien-search/alien-type)
+      (sort (mapcar (lambda (sym)
+                      (format "%s" (car sym)))
+                    alien-search/alien-type/.type-alst)
+            #'string<)
+      nil t nil
+      'alien-search/alien-type/.history
+      (format "%s" alien-search/alien-type) nil))))
+  (let ((kv-lst (or (cdr (assq name alien-search/alien-type/.type-alst))
+                    (cond
+                     ((null name)
+                      nil)
+                     (t
+                      (error "No such alien definition `%s'." name))))))
+    (setq alien-search/input-coding-system                      (cadr (memq :input-coding-system    kv-lst)))
+    (setq alien-search/output-coding-system                     (cadr (memq :output-coding-system   kv-lst)))
+    (setq alien-search/search-option-indicator/case-fold-str    (cadr (memq :indicator-case-fold    kv-lst)))
+    (setq alien-search/search-option-indicator/no-case-fold-str (cadr (memq :indicator-no-case-fold kv-lst)))
+    (setq alien-search/search-option-indicator/ext-regexp-str   (cadr (memq :indicator-ext-regexp   kv-lst)))
+    (setq alien-search/search-option-indicator/no-ext-regex-str (cadr (memq :indicator-no-ext-regex kv-lst)))
+    (setq alien-search/search-option-indicator/dot-match-str    (cadr (memq :indicator-dot-match    kv-lst)))
+    (setq alien-search/search-option-indicator/no-dot-match-str (cadr (memq :indicator-no-dot-match kv-lst)))
+    (setq alien-search/search-option-indicator/separator-str    (cadr (memq :indicator-separator    kv-lst)))
+    (setq alien-search/replace/external-program                 (cadr (memq :cmd-path-replace       kv-lst)))
+    (setq alien-search/replace/shell-script                     (cadr (memq :script-replace         kv-lst)))
+    (setq alien-search/occur/external-program                   (cadr (memq :cmd-path-occur         kv-lst)))
+    (setq alien-search/occur/shell-script                       (cadr (memq :script-occur           kv-lst)))
+    (setq alien-search/isearch/external-program                 (cadr (memq :cmd-path-isearch       kv-lst)))
+    (setq alien-search/isearch/shell-script                     (cadr (memq :script-isearch         kv-lst)))
+    (setq alien-search/quote-meta/external-program              (cadr (memq :cmd-path-quote-meta    kv-lst)))
+    (setq alien-search/quote-meta/shell-script                  (cadr (memq :script-quote-meta      kv-lst)))
+    (setq alien-search/re-builder/external-program              (cadr (memq :cmd-path-re-builder    kv-lst)))
+    (setq alien-search/re-builder/shell-script                  (cadr (memq :script-re-builder      kv-lst)))
+
+    (setq alien-search/alien-type name)
+    (cond
+     ((null name)
+      (message "[alien-search] Alien type is set to \"None\"."))
+     (t
+      (message "[alien-search] Alien type is set to \"%s\"" name)))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/alien-type/custom-widget/alien-type-selector/update NAME) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/alien-type/custom-widget/alien-type-selector/update ()
+  "Update a widget `alien-search/alien-type/custom-widget/alien-type-selector' which
+will be used to customize user option `alien-search/alien-type'."
+  (define-widget 'alien-search/alien-type/custom-widget/alien-type-selector 'lazy
+    "A widget, which will be used to customize user option
+`alien-search/alien-type'."
+    :offset 4
+    :tag    "Type"
+    :type   `(choice
+              (const :tag "None" nil)
+              ,@(mapcar (lambda (pair)
+                          (list 'const
+                                :tag (cadr (memq :tag (cdr pair)))
+                                (car pair)))
+                        alien-search/alien-type/.type-alst))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Main
+;;
+;; ----------------------------------------------------------------------------
+(run-with-idle-timer
+ 0 nil
+ '(lambda ()
+    (alien-search/alien-type/set alien-search/alien-type)))
 
 ;;; alien-search.el ends here
