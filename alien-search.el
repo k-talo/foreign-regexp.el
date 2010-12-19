@@ -182,6 +182,45 @@
 
 ;;; ===========================================================================
 ;;;
+;;;  For Debugging.
+;;;
+;;; ===========================================================================
+
+(eval-when-compile
+  (defvar alien-search/transition/debug-advices nil)
+  )
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
+
+(defmacro alien-search/debug (class &rest args)
+  "Display debugging message when CLASS has non-nil value."
+  (declare (indent 0) (debug t))
+  (when (and (boundp class)
+             (symbol-value class))
+    `(condition-case c
+         (with-current-buffer (get-buffer-create "*Messages*")
+           (let ((buffer-undo-list t)
+                 (orig-deactivate-mark deactivate-mark)
+                 (inhibit-modification-hooks t)
+                 (inhibit-point-motion-hooks t))
+             (goto-char (point-max))
+             (insert (format-time-string "[DEBUG %p%H:%M:%S] " (current-time)))
+             (insert (format ,@args))
+             (insert "\n")
+             (setq deactivate-mark orig-deactivate-mark)))
+       (error
+        (message "%s%s\n%s"
+                 (format-time-string "[DEBUG %p%H:%M:%S] " (current-time))
+                 (quote ,args)
+                 c)))))
+
+
+;;; ===========================================================================
+;;;
 ;;;  Variables and functions common to each `alien-search' operation.
 ;;;
 ;;; ===========================================================================
@@ -3097,6 +3136,12 @@ to each search option changed hook."
                                               (&rest args))
                       "Exit current isearch session and make a
 transition to another alien-search command."
+                      ;; DEBUGGING
+                      (alien-search/debug alien-search/transition/debug-advices
+                                          "TRANSITION: CALL: %s, %s"
+                                          (quote ,targ-command)
+                                          (quote ,ad-name-make-transition-to))
+                      
                       (lexical-let ((regexp isearch-string))
                         (unwind-protect
                             (isearch-exit)
@@ -3227,6 +3272,12 @@ And remember running command to prevent duplicate calls."
                                                        (&rest args))
                       "Allow making transition to another alien-search command
 while this function is running."
+                      ;; DEBUGGING
+                      (alien-search/debug alien-search/transition/debug-advices
+                                          "TRANSITION: CALL: %s, %s"
+                                          (quote ,transition-allowed-in)
+                                          (quote ,ad-name-allow-transition))
+                      
                       (let ((,g-transition-allowed-p t))
                         ad-do-it))
                     (alien-search/ad-activate (quote ,transition-allowed-in))
@@ -3239,6 +3290,13 @@ while this function is running."
                                          ,ad-name-catch-transition-to
                                          (&rest args))
                       "Make a transition to another alien-search command."
+                      
+                      ;; DEBUGGING
+                      (alien-search/debug alien-search/transition/debug-advices
+                                          "TRANSITION: CALL: %s, %s"
+                                          (quote ,command)
+                                          (quote ,ad-name-catch-transition-to))
+                      
                       ;; Prevent duplicate calls.
                       (when (eq this-command
                                 alien-search/transition/.running-cmd)
@@ -3254,6 +3312,12 @@ while this function is running."
                             (alien-search/catch-case var
                                 ad-do-it
                               (,ad-name-throw-transition-to
+                               ;; DEBUGGING
+                               (alien-search/debug alien-search/transition/debug-advices
+                                                   "TRANSITION: CATCHED BY: %s, %s\n"
+                                                   (quote ,command)
+                                                   (quote ,ad-name-catch-transition-to))
+                               
                                (lexical-let ((regexp (cadr var))
                                              (orig-messasge-fn
                                               (symbol-function 'message)))
@@ -3320,6 +3384,12 @@ make a transition to another one.
 
 Current contents of minibuffer will be thrown
 as the value of a tag."
+                      ;; DEBUGGING
+                      (alien-search/debug alien-search/transition/debug-advices
+                                          "TRANSITION: CALL: %s, %s"
+                                          (quote ,targ-command)
+                                          (quote ,ad-name-throw-transition-to))
+
                       ;; MEMO-1: This advice will be enabled/disabled in
                       ;;         advice of each alien-search command.
                       ;; MEMO-2: When the flag `,g-transition-allowed-p' is
@@ -3331,6 +3401,12 @@ as the value of a tag."
                              ,g-transition-allowed-p)
                         (let ((contents (alien-search/read-minibuf-contents)))
                           (when contents
+                            ;; DEBUGGING
+                            (alien-search/debug alien-search/transition/debug-advices
+                                                "TRANSITION: THROWN: %s ,%s"
+                                                (quote ,ad-name-throw-transition-to)
+                                                contents)
+                            
                             (throw (quote ,ad-name-throw-transition-to)
                                    contents))))
                        (t
