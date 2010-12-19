@@ -882,7 +882,7 @@ This is a side effect free version of `ad-activate'."
 
 ;;; ===========================================================================
 ;;;
-;;;  `query-replace' with a help from external program.
+;;;  `query-replace' in alien regexp with a help from external program.
 ;;;
 ;;; ===========================================================================
 
