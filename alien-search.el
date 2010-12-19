@@ -3081,13 +3081,13 @@ transition to another alien-search command."
                                ;;       *RE-Builder* properly.
                                `((case reb-re-syntax
                                    ((alien)
-                                    ((let ((this-command (quote ,targ-command)))
-                                       (call-interactively (quote ,targ-command)))
-                                     (with-current-buffer (get-buffer reb-buffer)
-                                       (delete-region (point-min) (point-max))
-                                       (insert regexp)))
-                                    (t
-                                     (error "[alien-search] RE-Builder syntax is not `alien'."))))))
+                                    (let ((this-command (quote ,targ-command)))
+                                      (call-interactively (quote ,targ-command)))
+                                    (with-current-buffer (get-buffer reb-buffer)
+                                      (delete-region (point-min) (point-max))
+                                      (insert regexp)))
+                                   (t
+                                    (error "[alien-search] RE-Builder syntax is not `alien'.")))))
                               ((minibuf-cmd)
                                `((run-with-idle-timer
                                   0 nil
@@ -3235,13 +3235,13 @@ while this function is running."
                                       ;;       *RE-Builder* properly.
                                       `((case reb-re-syntax
                                           ((alien)
-                                           ((let ((this-command (quote ,targ-command)))
-                                              (call-interactively (quote ,targ-command)))
-                                            (with-current-buffer (get-buffer reb-buffer)
-                                              (delete-region (point-min) (point-max))
-                                              (insert regexp)))
-                                           (t
-                                            (error "[alien-search] RE-Builder syntax is not `alien'."))))))
+                                           (let ((this-command (quote ,targ-command)))
+                                             (call-interactively (quote ,targ-command)))
+                                           (with-current-buffer (get-buffer reb-buffer)
+                                             (delete-region (point-min) (point-max))
+                                             (insert regexp)))
+                                          (t
+                                           (error "[alien-search] RE-Builder syntax is not `alien'.")))))
                                      ((isearch-cmd)
                                       `((run-with-idle-timer
                                          0 nil
