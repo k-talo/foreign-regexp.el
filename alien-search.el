@@ -187,6 +187,7 @@
 ;;; ===========================================================================
 
 (eval-when-compile
+  (defvar alien-search/search/debug-cache nil)
   (defvar alien-search/transition/debug-advices nil)
   )
 
@@ -1850,17 +1851,18 @@ when it has nil value.")
       ;; Return the number of matches
       globalcount)))
 
-  
+
 ;;; ===========================================================================
 ;;;
-;;;  `isearch' with a help from external program.
+;;;  `search-forward' and `search-backward' for alien regexp
+;;;                                         with a help from external program.
 ;;;
 ;;; ===========================================================================
 
-(defvar alien-search/isearch/external-program nil
+(defvar alien-search/search/external-program nil
   "Path of an external program to use to execute actual search operation.
 
-Six arguments describe below will be passed to the program.
+Seven arguments describe below will be passed to the program.
 
  1st: Path of a file which contains the text to be searched.
 
@@ -1873,9 +1875,15 @@ Six arguments describe below will be passed to the program.
       The external program have to output a form like:
 
         (setq result
-              '((1st-MATCH-START 1st-MATCH-END)
+              '((1st-MATCH-START 1st-MATCH-END
+                 SUB-MATCH-1-IN-1st-MATCH-START SUB-MATCH-1-IN-1st-MATCH-END
+                 SUB-MATCH-2-IN-1st-MATCH-START SUB-MATCH-2-IN-1st-MATCH-END
+                 ...)
                 (2nd-MATCH-START 2nd-MATCH-END)
-                 ...))
+                 SUB-MATCH-1-IN-2nd-MATCH-START SUB-MATCH-1-IN-2nd-MATCH-END
+                 SUB-MATCH-2-IN-2nd-MATCH-START SUB-MATCH-2-IN-2nd-MATCH-END
+                 ...)
+                ...)
 
       to this file.
 
@@ -1905,19 +1913,359 @@ Six arguments describe below will be passed to the program.
  6th: An extended regular expression flag.
       When the value of this flag is not empty string,
       the current search pattern(:see 3rd arg) should be
-      interpreted as extended regular expression.")
+      interpreted as extended regular expression.
 
-(defvar alien-search/isearch/shell-script nil
+ 7th: Positive integer when we want limit the matches, or empty
+      string when we don't want limit the matches.")
+
+(defvar alien-search/search/shell-script nil
   "A shell script which will be run as
-`alien-search/isearch/external-program'
+`alien-search/search/external-program'
 when it has nil value.")
 
 
-(defvar alien-search/isearch/.cached-data nil
-  "Private variable.")
-(defvar alien-search/isearch/.last-regexp nil
-  "Private variable.")
+;; ----------------------------------------------------------------------------
+;;
+;;  Macros
+;;
+;; ----------------------------------------------------------------------------
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/with-regarding-string-as-alien-regexp
+;;                      (string &optional limit) &rest body) => RESULT OF BODY
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/search/with-regarding-string-as-alien-regexp (args &rest body)
+  "Run BODY with applying `alien-search/search/forward' and
+`alien-search/search/backward' to STRING in substitution for
+`re-search-forward' and `re-search-backward'.
+
+Note that the equivalence of the STRING are tested in `eq'.
+
+When LIMIT is a number, match will be limited to the LIMIT.
+When LIMIT is NIL, match won't be limited.
+
+\(FN (STRING &OPTIONAL LIMIT) &REST BODY)"
+  (declare (indent 1))
+  (let ((g-orig-re-fwd-fn  (gensym))
+        (g-orig-re-bkwd-fn (gensym))
+        (g-regexp          (gensym))
+        (g-limit           (gensym))
+        (g-args            (gensym)))
+    `(let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
+           (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
+       (unwind-protect
+           (lexical-let ((,g-regexp ,(nth 0 args))
+                         (,g-limit  ,(nth 1 args)))
+             (setf (symbol-function 're-search-forward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((eq regexp
+                           ,g-regexp)
+                       (funcall 'alien-search/search/forward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-fwd-fn 
+                                regexp bound noerror count)))))
+             (setf (symbol-function 're-search-backward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((eq regexp
+                           ,g-regexp)
+                       (funcall 'alien-search/search/backward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-bkwd-fn
+                                regexp bound noerror count)))))
+             ,@body)
+         (setf (symbol-function 're-search-forward)  ,g-orig-re-fwd-fn)
+         (setf (symbol-function 're-search-backward) ,g-orig-re-bkwd-fn)))))
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/forward regexp &optional bound noerror count limit)
+;;                                                                    => POINT
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/forward (regexp &optional bound noerror count limit)
+  "Search forward from point for REGEXP in alien manner.
+See also `re-search-forward'."
+  (interactive
+   (and
+    (alien-search/search/assert-available)
+    (alien-search/read-from-minibuf/with-search-option-indicator
+     (list (read-from-minibuffer "Search for alien regexp: "
+                                 nil nil nil
+                                 'alien-search/history)))))
+  (let* ((buf    (current-buffer))
+         (data   (or (alien-search/search/cache/get    buf regexp limit)
+                     (alien-search/search/cache/update buf regexp limit)))
+         (pt     (point))
+         (be-lst (car (member-if #'(lambda (be-lst)
+                                     (<= pt (nth 0 be-lst)))
+                                 data)))
+         (beg    (and be-lst (nth 0 be-lst)))
+         (end    (and be-lst (nth 1 be-lst))))
+    (cond
+     ((and be-lst
+           (if bound (<= end bound) t))
+      (set-match-data (copy-list be-lst))
+      (goto-char end)
+      (cond
+       ((and count
+             (< 0 (1- count)))
+        (alien-search/search/forward
+         regexp bound noerror (1- count) limit))
+       (t
+        end)))
+     ((eq noerror
+          t)
+      nil)
+     (noerror
+      (goto-char (or bound
+                     (point-max)))
+      nil)
+     (t
+      (signal 'search-failed
+              regexp)))))
+      
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/backward regexp &optional bound noerror count limit)
+;;                                                                    => POINT
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/backward (regexp &optional bound noerror count limit)
+  "Search backward from point for REGEXP in alien manner.
+See also `re-search-backward'."
+  (interactive
+   (and
+    (alien-search/search/assert-available)
+    (alien-search/read-from-minibuf/with-search-option-indicator
+     (list (read-from-minibuffer "Search for alien regexp backward: "
+                                 nil nil nil
+                                 'alien-search/history)))))
+  (let* ((buf    (current-buffer))
+         (data   (reverse (or (alien-search/search/cache/get    buf regexp limit)
+                              (alien-search/search/cache/update buf regexp limit))))
+         (pt     (point))
+         (be-lst (car (member-if
+                       #'(lambda (be-lst)
+                           (<= (nth 1 be-lst) pt))
+                       data)))
+         (beg    (and be-lst (nth 0 be-lst)))
+         (end    (and be-lst (nth 1 be-lst))))
+    (cond
+     ((and be-lst
+           (if bound (<= bound beg) t))
+      (set-match-data (copy-list be-lst))
+      (goto-char beg)
+      (cond
+       ((and count
+             (< 0 (1- count)))
+        (alien-search/search/backward
+         regexp bound noerror (1- count) limit))
+       (t
+        beg)))
+     ((eq noerror
+          t)
+      nil)
+     (noerror
+      (goto-char (or bound
+                     (point-max)))
+      nil)
+     (t
+      (signal 'search-failed
+              regexp)))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/available-p ()
+  "Test if external program or shell script is defined or not."
+  (or alien-search/search/external-program
+      alien-search/search/shell-script))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/assert-available) => BOOL or ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/assert-available ()
+  "Raise error when no external program or shell script is defined."
+  (or (alien-search/search/available-p)
+      (error "[alien-search] No external program or shell script is defined.")))
+
+
+;;; ===========================================================================
+;;;
+;;;  Cache data for `alien-search/search/forward'
+;;;                                       and `alien-search/search/backward'.
+;;;
+;;; ===========================================================================
+
+(defvar alien-search/search/.cache-alst nil)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/cache/pre-command-hook-fn) void
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/cache/pre-command-hook-fn ()
+  "Clear cache before any command will run.
+
+When `this-command' has property `alien-search/search/ongoing-search-cmd-p',
+cache won't be cleared."
+  (condition-case c
+      (when (not (and (symbolp this-command)
+                      (get this-command
+                           'alien-search/search/ongoing-search-cmd)))
+        (alien-search/search/cache/clear-all))
+    (error
+     (message "[alien-search] %s" c))))
+
+(put 'isearch-repeat-forward  'alien-search/search/ongoing-search-cmd t)
+(put 'isearch-repeat-backward 'alien-search/search/ongoing-search-cmd t)
+
+(add-hook 'pre-command-hook 'alien-search/search/cache/pre-command-hook-fn)
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/cache/get buf regexp &optional limit) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/cache/get (buf regexp &optional limit)
+  "Returns cache data, which is the result of a search
+in BUF for REGEXP by external program."
+  (with-current-buffer buf
+    (let* ((cache-alst-for-buf (cdr (assq buf     alien-search/search/.cache-alst)))
+           (cache-alst-for-str (cdr (assq regexp  cache-alst-for-buf)))
+           (cached-data        (cdr (assq 'data   cache-alst-for-str)))
+           (cached-limit       (cdr (assq 'limit  cache-alst-for-str)))
+           (cached-tick        (cdr (assq 'tick   cache-alst-for-str)))
+           (cached-pt-min      (cdr (assq 'pt-min cache-alst-for-str)))
+           (cached-pt-max      (cdr (assq 'pt-max cache-alst-for-str)))
+           (cur-tick           (buffer-chars-modified-tick buf))
+           (cur-pt-min         (point-min))
+           (cur-pt-max         (point-max)))
+      
+      (when (and cache-alst-for-str
+                 (or (not (equal cached-limit  limit))
+                     (/=         cached-tick   cur-tick)
+                     (/=         cached-pt-min cur-pt-min)
+                     (/=         cached-pt-max cur-pt-max)))
+        (assq-delete-all regexp cache-alst-for-buf)
+        (setq cached-data nil))
+      cached-data)))
+
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/cache/clear buf regexp) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/cache/clear (buf regexp)
+  "Clear cache data, which is the result of a search
+in BUF for REGEXP by external program."
+  (when (assq regexp
+              (cdr (assq buf alien-search/search/.cache-alst)))
+    (alien-search/debug alien-search/search/debug-cache
+                        "Clear: %s, \"%s\"\n" buf regexp)
+    (assq-delete-all
+     regexp
+     (cdr (assq buf alien-search/search/.cache-alst)))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/cache/clear-all) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/cache/clear-all ()
+  "Clear all of cache data, which is the result of a search
+by external program."
+  (when alien-search/search/.cache-alst
+    (alien-search/debug alien-search/search/debug-cache
+                        "Clear: All\n")
+    (setq alien-search/search/.cache-alst nil)))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/search/cache/update buf regexp) => LIST
+;; ----------------------------------------------------------------------------
+(defun alien-search/search/cache/update (buf regexp &optional limit)
+  "Update cache data, which is the result of a search
+in BUF for REGEXP by external program."
+  (alien-search/debug alien-search/search/debug-cache
+                      "Update: %s, \"%s\"\n" buf regexp)
+  (condition-case c
+      (with-current-buffer buf
+        (let ((pt-min      (point-min))
+              (pt-max      (point-max))
+              (case-fold-p (if isearch-mode
+                               isearch-case-fold-search
+                             case-fold-search))
+              result)
+          (setq result
+                (alien-search/run-external-program
+                 alien-search/search/external-program
+                 alien-search/search/shell-script
+                 (buffer-substring pt-min pt-max)
+                 regexp
+                 nil
+                 (if alien-search/dot-match-a-newline-p "DOT"  "")
+                 (if (not case-fold-p)                  "CASE" "") 
+                 (if alien-search/use-extended-regexp-p "EXT"  "")
+                 (cond
+                  ((null     limit) "")
+                  ((integerp limit) (format "%s" limit))
+                  (t
+                   (error "[alien-search] `%s' is not type of number or null."
+                          limit)))))
+
+          (dolist (be-lst result)
+            (dotimes (i (length be-lst))
+              (setf (nth i be-lst)
+                    (+ pt-min (nth i be-lst))))) ;; [Count + Offset => Count]
+
+          ;; Remove old cache.
+          (alien-search/search/cache/clear buf regexp)
+
+          ;; Save new cache.
+          (or (assq buf alien-search/search/.cache-alst)
+              (push (list buf)
+                    alien-search/search/.cache-alst))
+          (push (cons regexp
+                      (list (cons 'data   result)
+                            (cons 'limit  limit)
+                            (cons 'tick   (buffer-chars-modified-tick buf))
+                            (cons 'pt-min pt-min)
+                            (cons 'pt-max pt-max)))
+                (cdr (assq buf alien-search/search/.cache-alst)))
+          result))
+    (error
+     (unwind-protect
+         ;; Remove old cache.
+         (alien-search/search/cache/clear buf regexp)
+       (signal 'invalid-regexp
+               (list (concat "[alien-search] "
+                             (error-message-string c))))))))
+
+  
+;;; ===========================================================================
+;;;
+;;;  `isearch' with a help from external program.
+;;;
+;;; ===========================================================================
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -1936,9 +2284,6 @@ See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
   (interactive "P\np")
   (alien-search/isearch/assert-available)
-  
-  (setq alien-search/isearch/.cached-data nil)
-  (setq alien-search/isearch/.last-regexp nil)
   
   ;; Setup `isearch-search-fun-function'.
   (when (not (boundp 'alien-search/isearch/orig-isearch-search-fun-function))
@@ -1966,9 +2311,6 @@ See `isearch-forward-regexp' and `isearch-backward-regexp' for
 more information."
   (interactive "P\np")
   (alien-search/isearch/assert-available)
-  
-  (setq alien-search/isearch/.cached-data nil)
-  (setq alien-search/isearch/.last-regexp nil)
   
   ;; Setup `isearch-search-fun-function'.
   (when (not (boundp 'alien-search/isearch/orig-isearch-search-fun-function))
@@ -2011,7 +2353,6 @@ more information."
                           'face 'minibuffer-prompt)
                          t t ad-return-value))))
 
-
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Functions
@@ -2021,18 +2362,12 @@ more information."
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/available-p) => BOOL
 ;; ----------------------------------------------------------------------------
-(defun alien-search/isearch/available-p ()
-  "Test if external program or shell script is defined or not."
-  (or alien-search/isearch/external-program
-      alien-search/isearch/shell-script))
+(defalias 'alien-search/isearch/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/assert-available) => BOOL or ERROR
 ;; ----------------------------------------------------------------------------
-(defun alien-search/isearch/assert-available ()
-  "Raise error when no external program or shell script is defined."
-  (or (alien-search/isearch/available-p)
-      (error "[alien-search] No external program or shell script is defined.")))
+(defalias 'alien-search/isearch/assert-available 'alien-search/search/assert-available)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/isearch/search-option-changed-hook-fn) => VOID
@@ -2041,7 +2376,6 @@ more information."
   "Update display when search option is changed."
   (when isearch-mode
     (setq isearch-success t isearch-adjusted t)
-    (setq alien-search/isearch/.cached-data nil)
     
     ;; Force run `isearch-lazy-highlight-new-loop'.
     (setq isearch-lazy-highlight-last-string nil)
@@ -2092,79 +2426,14 @@ to each search option changed hook."
 isearch by alien-search is going on.
 
 This function returns the search function
-`alien-search/isearch/search-fun' for isearch to use."
-  #'alien-search/isearch/search-fun)
+`alien-search/search/forward' or `alien-search/search/backward'
+for isearch to use."
+  (cond
+   (isearch-forward
+    'alien-search/search/forward)
+   (t
+    'alien-search/search/backward)))
 
-;; ----------------------------------------------------------------------------
-;;  (alien-search/isearch/search-fun regexp &optional bound noerror count)
-;;                                                                    => POINT
-;; ----------------------------------------------------------------------------
-(defun alien-search/isearch/search-fun (regexp &optional bound noerror count)
-  "Search for the first occurrence of REGEXP in alien manner.
-If found, move point to the end of the occurrence,
-update the match data, and return point.
-
-This function will be used as alternate function of `re-search-forward'
-and `re-search-backward' while isearch by alien-search is on."
-  (when (or (not (equal alien-search/isearch/.last-regexp
-                        regexp))
-            (not alien-search/isearch/.cached-data))
-    (condition-case c
-        (let ((pt-min (point-min))
-              (pt-max (point-max)))
-          (setq alien-search/isearch/.cached-data
-                (alien-search/run-external-program
-                 alien-search/isearch/external-program
-                 alien-search/isearch/shell-script
-                 (buffer-substring pt-min pt-max)
-                 regexp
-                 nil
-                 (if alien-search/dot-match-a-newline-p "DOT" "")
-                 (if isearch-case-fold-search "" "CASE")
-                 (if alien-search/use-extended-regexp-p "EXT" "")))
-          (dolist (be-lst alien-search/isearch/.cached-data)
-            (setf (nth 0 be-lst)
-                  (+ pt-min (nth 0 be-lst))) ;; [Count + Offset => Count]
-            (setf (nth 1 be-lst)
-                  (+ pt-min (nth 1 be-lst))))) ;; [Count + Offset => Count]
-      (error
-       (signal 'invalid-regexp
-               (cdr c))))
-    (setq alien-search/isearch/.last-regexp
-          regexp))
-  (let ((forward-p isearch-forward)
-        (pt (point)))
-    (if forward-p
-        ;; Search forward
-        (let* ((data alien-search/isearch/.cached-data)
-               (be-lst (car (member-if
-                             #'(lambda (be-lst)
-                                 (<= pt (nth 0 be-lst)))
-                             data)))
-               (beg (and be-lst (nth 0 be-lst)))
-               (end (and be-lst (nth 1 be-lst))))
-          (when (and be-lst
-                     (if bound
-                         (<= end bound)
-                       t))
-            (set-match-data (list beg end))
-            (goto-char end)
-            end))
-      ;; Search backward
-      (let* ((data (reverse alien-search/isearch/.cached-data))
-             (be-lst (car (member-if
-                           #'(lambda (be-lst)
-                               (<= (nth 1 be-lst) pt))
-                           data)))
-             (beg (and be-lst (nth 0 be-lst)))
-             (end (and be-lst (nth 1 be-lst))))
-        (when (and be-lst
-                   (if bound
-                       (<= bound beg)
-                     t))
-          (set-match-data (list beg end))
-          (goto-char beg)
-          beg)))))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2256,131 +2525,6 @@ when it has nil value.")
 ;;;
 ;;; ===========================================================================
 (require 're-builder)
-
-(defvar alien-search/re-builder/external-program nil
-  "Path of an external program to use to execute actual search operation.
-
-Seven arguments describe below will be passed to the program.
-
- 1st: Path of a file which contains the text to be searched.
-
-      The text in this file is encoded in the value of
-      `alien-search/output-coding-system'.
-
- 2nd: Path of a file to which the program should write the result
-      of current search operation.
-
-      The external program have to output a form like:
-
-        (setq result
-              '((1st-MATCH-START 1st-MATCH-END
-                 SUB-MATCH-1-IN-1st-MATCH-START SUB-MATCH-1-IN-1st-MATCH-END
-                 SUB-MATCH-2-IN-1st-MATCH-START SUB-MATCH-2-IN-1st-MATCH-END
-                 ...)
-                (2nd-MATCH-START 2nd-MATCH-END)
-                 SUB-MATCH-1-IN-2nd-MATCH-START SUB-MATCH-1-IN-2nd-MATCH-END
-                 SUB-MATCH-2-IN-2nd-MATCH-START SUB-MATCH-2-IN-2nd-MATCH-END
-                 ...)
-                ...)
-
-      to this file.
-
-      Note that each start and end position in the form should be
-      an offset from beginning of the text which has been searched.
-      (This means each number should be started from 0, not from 1)
-
-      The text in this file must be encoded in the value of
-      `alien-search/input-coding-system'.
-
- 3rd: Path of a file in which the pattern we want to search is written.
-      The program have a responsibility to search this pattern
-      from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument.
-
-      The text in this file is encoded in the value of
-      `alien-search/output-coding-system'.
-
- 4th: A dot matches newline flag.
-      When the value of this flag is not empty string,
-      . should be matched to a newline character.
-
- 5th: A case sensitive flag.
-      When the value of this flag is not empty string,
-      the match operation should be done case-sensitive.
-
- 6th: An extended regular expression flag.
-      When the value of this flag is not empty string,
-      the current search pattern(:see 3rd arg) should be
-      interpreted as extended regular expression.
-
- 7th: Positive integer when we want limit the matches, or empty
-      string when we don't want limit the matches.")
-
-(defvar alien-search/re-builder/shell-script nil
-  "A shell script which will be run as
-`alien-search/re-builder/external-program'
-when it has nil value.")
-
-(defvar alien-search/re-builder/.cached-data nil
-  "Private variable.")
-(defvar alien-search/re-builder/.last-regexp nil
-  "Private variable.")
-
-
-;; ----------------------------------------------------------------------------
-;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/with-overriding-re-search-fn ((&keys re-search-forward-fn
-;;                                                     re-search-backward-fn
-;;                                                     when-regexp-eq)
-;;                                              &rest body) => RESULT FROM BODY
-;; ----------------------------------------------------------------------------
-(defmacro alien-search/with-overriding-re-search-fn (args &rest body)
-  "Run BODY with alternating `re-search-forward' and
-`re-search-backward' with functions RE-SEARCH-FORWARD-FN
-and RE-SEARCH-BACKWARD-FN when the REGEXP, the first
-argument of `re-search-forward' and `re-search-backward',
-is `eq' to the string WHEN-REGEXP-EQ."
-  (declare (indent defun))
-  (let ((g-orig-re-search-forward-fn  (gensym))
-        (g-orig-re-search-backward-fn (gensym))
-        (g-re-search-forward-fn       (gensym))
-        (g-re-search-backward-fn      (gensym))
-        (g-when-regexp-eq             (gensym))
-        (g-args                       (gensym)))
-    `(let ((,g-orig-re-search-forward-fn  (symbol-function 're-search-forward))
-           (,g-orig-re-search-backward-fn (symbol-function 're-search-backward))
-           (,g-re-search-forward-fn  ,(or (cadr (memq :re-search-forward-fn args))
-                                          (error "No `:re-search-forward-fn'!")))
-           (,g-re-search-backward-fn ,(or (cadr (memq :re-search-backward-fn args))
-                                          (error "No `:re-search-backward-fn'!")))
-           (,g-when-regexp-eq        ,(or (cadr (memq :when-regexp-eq args))
-                                          (error "No `:when-regexp-eq'!"))))
-       (unwind-protect
-           (progn
-             (setf (symbol-function 're-search-forward)
-                   '(lambda (&rest ,g-args)
-                      (cond
-                       ((eq (car ,g-args)
-                            ,g-when-regexp-eq)
-                        (apply ,g-re-search-forward-fn ,g-args))
-                       (t
-                        (apply ,g-orig-re-search-forward-fn ,g-args)))))
-             (setf (symbol-function 're-search-backward)
-                   '(lambda (&rest ,g-args)
-                      (cond
-                       ((eq (car ,g-args)
-                            ,g-when-regexp-eq)
-                        (apply ,g-re-search-backward-fn ,g-args))
-                       (t
-                        (apply ,g-orig-re-search-backward-fn ,g-args)))))
-             ,@body)
-         (setf (symbol-function 're-search-forward)  ,g-orig-re-search-forward-fn)
-         (setf (symbol-function 're-search-backward) ,g-orig-re-search-backward-fn)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/exec-with-current-re re-var &rest body)
@@ -2566,43 +2710,35 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;;
 ;; ----------------------------------------------------------------------------
 
-(defadvice re-builder (before alien-search/re-builder/re-builder ())
-  (setq alien-search/re-builder/.cached-data nil))
-(alien-search/ad-activate 're-builder)
-
 (defadvice reb-next-match (around alien-search/re-builder/ext-match ())
   (case reb-re-syntax
     ((alien)
      (alien-search/re-builder/assert-available)
-     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :re-search-backward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :when-regexp-eq
-                                                 (with-current-buffer reb-target-buffer
-                                                   reb-regexp))
-       (let ((alien-search/re-builder/forward-p t))
-         ad-do-it)))
+     (alien-search/search/with-regarding-string-as-alien-regexp
+         ((reb-target-binding reb-regexp)
+          ;; Match limit.
+          (if (numberp reb-auto-match-limit)
+              reb-auto-match-limit nil))
+       ad-do-it))
     (t
      ad-do-it)))
 (alien-search/ad-activate 'reb-next-match)
+(put 'reb-next-match  'alien-search/search/ongoing-search-cmd t)
 
 (defadvice reb-prev-match (around alien-search/re-builder/prev-match ())
   (case reb-re-syntax
     ((alien)
      (alien-search/re-builder/assert-available)
-     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :re-search-backward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :when-regexp-eq
-                                                 (with-current-buffer reb-target-buffer
-                                                   reb-regexp))
-       (let ((alien-search/re-builder/forward-p nil))
-         ad-do-it)))
+     (alien-search/search/with-regarding-string-as-alien-regexp
+         ((reb-target-binding reb-regexp)
+          ;; Match limit.
+          (if (numberp reb-auto-match-limit)
+              reb-auto-match-limit nil))
+       ad-do-it))
     (t
      ad-do-it)))
 (alien-search/ad-activate 'reb-prev-match)
+(put 'reb-prev-match 'alien-search/search/ongoing-search-cmd t)
 
 (defadvice reb-copy (around alien-search/re-builder/copy ())
   (case reb-re-syntax
@@ -2611,6 +2747,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (kill-new (buffer-substring-no-properties (point-min) (point-max))))
    (t ad-do-it)))
 (alien-search/ad-activate 'reb-copy)
+(put 'reb-copy 'alien-search/search/ongoing-search-cmd t)
 
 (defadvice reb-change-syntax (around alien-search/re-builder/change-syntax (&optional syntax))
   (interactive
@@ -2661,32 +2798,54 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
    (t ad-do-it)))
 (alien-search/ad-activate 'reb-insert-regexp)
 
+(defadvice reb-update-regexp (around alien-search/re-builder/update-regexp ())
+  (case reb-re-syntax
+   ((alien)
+    (let ((regexp (reb-read-regexp)))
+      (with-current-buffer reb-target-buffer
+        ;; Do not reset `reb-regexp' so that `eq' can
+        ;; determine the equivalence.
+        (when (not (equal reb-regexp
+                          regexp))
+          (setq reb-regexp
+                regexp)
+          (setq ad-return-value t)))))
+   (t
+    ad-do-it)))
+(alien-search/ad-activate 'reb-update-regexp)
+
 (defadvice reb-count-subexps (around alien-search/re-builder/count-subexps (re))
   (case reb-re-syntax
    ((alien)
     (alien-search/re-builder/assert-available)
+    
+    ;; Count number of subexp in cache data.
+    ;;
     (let ((retval 0))
-      ;; Update `alien-search/re-builder/.cached-data'.
-      (alien-search/re-builder/search-fun (reb-target-binding reb-regexp) (point-max))
-      
-      (dolist (be-lst alien-search/re-builder/.cached-data)
-        (setq retval (max retval (1- (/ (length be-lst) 2)))))
-      (setq ad-return-value retval)))
+      (with-current-buffer reb-target-buffer
+        (save-excursion
+          (let ((buf    (current-buffer))
+                (regexp (reb-target-binding reb-regexp))
+                ;; Match limit.
+                (limit  (if (numberp reb-auto-match-limit)
+                            reb-auto-match-limit nil)))
+            (dolist (be-lst (or (alien-search/search/cache/get    buf regexp limit)
+                                (alien-search/search/cache/update buf regexp limit)))
+              (setq retval (max retval (1- (/ (length be-lst) 2))))))
+          (setq ad-return-value retval)))))
    (t ad-do-it)))
 (alien-search/ad-activate 'reb-count-subexps)
 
 (defadvice reb-update-overlays (around alien-search/re-builder/update-overlays (&optional subexp))
   (case reb-re-syntax
     ((alien)
-     (setq alien-search/re-builder/.cached-data nil)
      (alien-search/re-builder/assert-available)
-     (alien-search/with-overriding-re-search-fn (:re-search-forward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :re-search-backward-fn
-                                                 'alien-search/re-builder/search-fun
-                                                 :when-regexp-eq
-                                                 (with-current-buffer reb-target-buffer
-                                                   reb-regexp))
+
+     (alien-search/search/with-regarding-string-as-alien-regexp
+         ((reb-target-binding reb-regexp)
+          ;; Match limit.
+          (if (numberp reb-auto-match-limit)
+              reb-auto-match-limit nil))
        ad-do-it))
     (t
      ad-do-it)))
@@ -2702,18 +2861,12 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/available-p) => BOOL
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/available-p ()
-  "Test if external program or shell script is defined or not."
-  (or alien-search/re-builder/external-program
-      alien-search/re-builder/shell-script))
+(defalias 'alien-search/re-builder/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/assert-available) => BOOL or ERROR
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/assert-available ()
-  "Raise error when no external program or shell script is defined."
-  (or (alien-search/re-builder/available-p)
-      (error "[alien-search] No external program or shell script is defined.")))
+(defalias 'alien-search/re-builder/assert-available 'alien-search/search/assert-available)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/get-current-regexp) => STRING or NIL
@@ -2755,96 +2908,6 @@ When the current buffer is not *RE-Builder*, returns nil."
                         (setq alt-type nil))))
                    retval))))
             type)))
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/search-fun regexp &optional bound noerror count)
-;;                                                                    => POINT
-;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/search-fun (regexp &optional bound noerror count)
-  "Search for the first occurrence of REGEXP in alien manner.
-If found, move point to the end of the occurrence,
-update the match data, and return point.
-
-This function will be used as alternate function of `re-search-forward'
-and `re-search-backward' by `re-builder'."
-  (when (or (not (equal alien-search/re-builder/.last-regexp
-                        regexp))
-            (not alien-search/re-builder/.cached-data))
-    (let ((pt-min (with-current-buffer reb-target-buffer (point-min)))
-          (pt-max (with-current-buffer reb-target-buffer (point-max))))
-      (setq alien-search/re-builder/.cached-data
-            ;; Do not run external program when
-            ;; regexp is empty.
-            (if (and (stringp regexp)
-                     (not (equal regexp "")))
-                (condition-case c
-                    (with-current-buffer reb-target-buffer
-                      (alien-search/run-external-program
-                       alien-search/re-builder/external-program
-                       alien-search/re-builder/shell-script
-                       (buffer-substring pt-min pt-max)
-                       regexp
-                       nil
-                       (if alien-search/dot-match-a-newline-p "DOT" "")
-                       (if case-fold-search "" "CASE")
-                       (if alien-search/use-extended-regexp-p "EXT" "")
-                       (if (numberp reb-auto-match-limit)
-                           (format "%s" reb-auto-match-limit)
-                         "")))
-                  (error
-                   ;; It seems that re-builder throws away error messages,
-                   ;; so we leave error messages on *Messages* buffer.
-                   (message "%s" c)
-                   (error c)))
-              nil))
-      
-      (dolist (be-lst alien-search/re-builder/.cached-data)
-        (dotimes (i (length be-lst))
-          (setf (nth i be-lst)
-              (+ pt-min (nth i be-lst))))) ;; [Count + Offset => Count]
-    
-      (setq alien-search/re-builder/.last-regexp
-            regexp)))
-  (with-current-buffer reb-target-buffer
-    (let ((forward-p (if (boundp 'alien-search/re-builder/forward-p)
-                         alien-search/re-builder/forward-p
-                       t))
-          (pt (point)))
-      (if forward-p
-          ;; Search forward
-          (let* ((data alien-search/re-builder/.cached-data)
-                 (be-lst (car (member-if
-                               #'(lambda (be-lst)
-                                   (<= pt (nth 0 be-lst)))
-                               data)))
-                 (beg (and be-lst (nth 0 be-lst)))
-                 (end (and be-lst (nth 1 be-lst))))
-            (when (and be-lst
-                       (if bound
-                           (<= end bound)
-                         t))
-              (set-match-data `(,beg
-                                ,end
-                                ,@(cddr be-lst)))
-              (goto-char end)
-              end))
-        ;; Search backward
-        (let* ((data (reverse alien-search/re-builder/.cached-data))
-               (be-lst (car (member-if
-                             #'(lambda (be-lst)
-                                 (<= (nth 1 be-lst) pt))
-                             data)))
-               (beg (and be-lst (nth 0 be-lst)))
-               (end (and be-lst (nth 1 be-lst))))
-          (when (and be-lst
-                     (if bound
-                         (<= bound beg)
-                       t))
-            (set-match-data `(,beg
-                              ,end
-                              ,@(cddr be-lst)))
-            (goto-char beg)
-            beg))))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/reb-target-buffer-p buf) => BOOL
@@ -2904,19 +2967,16 @@ to each search option changed hook."
 (add-hook 'reb-mode-hook
           'alien-search/re-builder/setup-search-option-changed-hook)
 
+(put 'reb-enter-subexp-mode 'alien-search/search/ongoing-search-cmd t)
+(put 'reb-quit-subexp-mode  'alien-search/search/ongoing-search-cmd t)
+(put 'reb-display-subexp    'alien-search/search/ongoing-search-cmd t)
+
 
 ;;; ===========================================================================
 ;;;
 ;;;  Non-incremental search with a help from external program.
 ;;;
 ;;; ===========================================================================
-
-(defvar alien-search/non-incremental/.last-regexp nil
-  "Private variable.")
-
-(defvar alien-search/non-incremental/.cached-data nil
-  "Private variable.")
-
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2925,53 +2985,34 @@ to each search option changed hook."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/non-incremental/search-forward string) => POINT
+;;  (alien-search/non-incremental/search-forward regexp) => POINT
 ;; ----------------------------------------------------------------------------
 ;; From menu-bar.el
-(defun alien-search/non-incremental/search-forward (string)
+(defun alien-search/non-incremental/search-forward (&optional regexp)
   "Read a regular expression and search for it nonincrementally."
-  (interactive
-   (and
-    (alien-search/non-incremental/assert-available)
-    (list (read-from-minibuffer "Search for alien regexp: "
-                                nil nil nil
-                                'alien-search/history))))
-  (alien-search/non-incremental/assert-available)
-  (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
-        (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
-        (isearch-forward t))
-    (prog1
-        (alien-search/isearch/search-fun string)
-      (setq menu-bar-last-search-type 'alien)
-      
-      (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
-      (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
-      (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache))))
-(put 'alien-search/non-incremental/search-forward  'alien-search/nonincremental-command-p t)
+  (interactive)
+  (prog1
+      (cond
+       ((called-interactively-p)
+        (call-interactively 'alien-search/search/forward))
+       (t
+        (alien-search/search/forward regexp)))
+    (setq menu-bar-last-search-type 'alien)))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/non-incremental/search-backward string) => POINT
+;;  (alien-search/non-incremental/search-backward regexp) => POINT
 ;; ----------------------------------------------------------------------------
 ;; From menu-bar.el
-(defun alien-search/non-incremental/search-backward (string)
+(defun alien-search/non-incremental/search-backward (&optional regexp)
   "Read a regular expression and search for it backward nonincrementally."
-  (interactive
-   (and
-    (alien-search/non-incremental/assert-available)
-    (list (read-from-minibuffer "Search for alien regexp: "
-                               nil nil nil
-                               'alien-search/history))))
-  (let ((alien-search/isearch/.last-regexp alien-search/non-incremental/.last-regexp)
-        (alien-search/isearch/.cached-data alien-search/non-incremental/.cached-data)
-        (isearch-forward nil))
-    (prog1
-        (alien-search/isearch/search-fun string)
-      (setq menu-bar-last-search-type 'alien)
-      
-      (setq alien-search/non-incremental/.last-regexp alien-search/isearch/.last-regexp)
-      (setq alien-search/isearch/.last-regexp alien-search/isearch/.cached-data)
-      (add-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache))))
-(put 'alien-search/non-incremental/search-backward 'alien-search/nonincremental-command-p t)
+  (interactive)
+  (prog1
+      (cond
+       ((called-interactively-p)
+        (call-interactively 'alien-search/search/backward))
+       (t
+        (alien-search/search/backward regexp)))
+    (setq menu-bar-last-search-type 'alien)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -2987,11 +3028,11 @@ to each search option changed hook."
        ((and (eq menu-bar-last-search-type 'alien)
              alien-search/history)
         (setq ad-return-value
-              (alien-search/non-incremental/search-forward (car alien-search/history))))
+              (alien-search/search/forward (car alien-search/history))))
        (t
         ad-do-it)))
     (alien-search/ad-activate 'nonincremental-repeat-search-forward)
-    (put 'nonincremental-repeat-search-forward 'alien-search/nonincremental-command-p t))
+    (put 'nonincremental-repeat-search-forward 'alien-search/search/ongoing-search-cmd t))
 
   (when (fboundp 'nonincremental-repeat-search-backward)
     (defadvice nonincremental-repeat-search-backward (around alien-search/nonincremental-repeat-search-backward ())
@@ -2999,12 +3040,11 @@ to each search option changed hook."
        ((and (eq menu-bar-last-search-type 'alien)
              alien-search/history)
         (setq ad-return-value
-              (alien-search/non-incremental/search-backward (car alien-search/history))))
+              (alien-search/search/backward (car alien-search/history))))
        (t
         ad-do-it)))
     (alien-search/ad-activate 'nonincremental-repeat-search-backward)
-    (put 'nonincremental-repeat-search-backward 'alien-search/nonincremental-command-p t)))
-
+    (put 'nonincremental-repeat-search-backward 'alien-search/search/ongoing-search-cmd t)))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -3015,27 +3055,12 @@ to each search option changed hook."
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/non-incremental/available-p) => BOOL
 ;; ----------------------------------------------------------------------------
-(defun alien-search/non-incremental/available-p ()
-  "Test if external program or shell script is defined or not."
-  (or alien-search/isearch/external-program
-      alien-search/isearch/shell-script))
+(defalias 'alien-search/non-incremental/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/non-incremental/assert-available) => BOOL or ERROR
 ;; ----------------------------------------------------------------------------
-(defun alien-search/non-incremental/assert-available ()
-  "Raise error when no external program or shell script is defined."
-  (or (alien-search/non-incremental/available-p)
-      (error "[alien-search] No external program or shell script is defined.")))
-
-;; ----------------------------------------------------------------------------
-;;  (alien-search/non-incremental/.clear-cache) => VOID
-;; ----------------------------------------------------------------------------
-(defun alien-search/non-incremental/.clear-cache ()
-  "Private function."
-  (when (not (get this-command 'alien-search/nonincremental-command-p))
-    (setq alien-search/non-incremental/.cached-data nil)
-    (remove-hook 'pre-command-hook 'alien-search/non-incremental/.clear-cache)))
+(defalias 'alien-search/non-incremental/assert-available 'alien-search/search/assert-available)
 
 
 ;;; ===========================================================================
@@ -3481,16 +3506,14 @@ as the value of a tag."
 ;;                                       indicator-dot-match
 ;;                                       indicator-no-dot-match
 ;;                                       indicator-separator
+;;                                       cmd-path-search
 ;;                                       cmd-path-replace
 ;;                                       cmd-path-occur
-;;                                       cmd-path-isearch
 ;;                                       cmd-path-quote-meta
-;;                                       cmd-path-re-builder
+;;                                       script-search
 ;;                                       script-replace
 ;;                                       script-occur
-;;                                       script-isearch
-;;                                       script-quote-meta
-;;                                       script-re-builder) => VOID
+;;                                       script-quote-meta) => VOID
 ;; ----------------------------------------------------------------------------
 (defun* alien-search/alien-type/define (&key name
                                              tag
@@ -3503,16 +3526,14 @@ as the value of a tag."
                                              indicator-dot-match
                                              indicator-no-dot-match
                                              indicator-separator
+                                             script-search
                                              script-replace
                                              script-occur
-                                             script-isearch
                                              script-quote-meta
-                                             script-re-builder
+                                             cmd-path-search
                                              cmd-path-replace
                                              cmd-path-occur
-                                             cmd-path-isearch
-                                             cmd-path-quote-meta
-                                             cmd-path-re-builder)
+                                             cmd-path-quote-meta)
   ;; FIXME: Write document.
   "Define an Alien Type.
 
@@ -3553,35 +3574,29 @@ Arguments are:
   INDICATOR-SEPARATOR:
         See `alien-search/search-option-indicator/separator-str'.
       
+  CMD-PATH-SEARCH:
+        See `alien-search/search/external-program'.
+
   CMD-PATH-REPLACE:
         See `alien-search/replace/external-program'.
 
   CMD-PATH-OCCUR:
         See `alien-search/occur/external-program'.
 
-  CMD-PATH-ISEARCH:
-        See `alien-search/isearch/external-program'.
-
   CMD-PATH-QUOTE-META:
         See `alien-search/quote-meta/external-program'.
 
-  CMD-PATH-RE-BUILDER:
-        See `alien-search/re-builder/external-program'.
-
+  SCRIPT-SEARCH:
+        See `alien-search/search/shell-script'.
+      
   SCRIPT-REPLACE:
         See `alien-search/replace/shell-script'.
 
   SCRIPT-OCCUR:
         See `alien-search/occur/shell-script'.
       
-  SCRIPT-ISEARCH:
-        See `alien-search/isearch/shell-script'.
-      
   SCRIPT-QUOTE-META:
-        See `alien-search/quote-meta/shell-script'.
-      
-  SCRIPT-RE-BUILDER:
-        See `alien-search/re-builder/shell-script'."
+        See `alien-search/quote-meta/shell-script'."
   ;; Validation
   ;;
   (or name                   (error "[alien-search] No `:name'!"))
@@ -3596,24 +3611,18 @@ Arguments are:
   (or indicator-no-dot-match (error "[alien-search] No `:indicator-no-dot-match'!"))
   (or indicator-separator    (error "[alien-search] No `:indicator-separator'!"))
 
+  (or script-search
+      cmd-path-search
+      (error "[alien-search] No `:cmd-path-search' or `:cmd-path-search'!"))
   (or script-replace
       cmd-path-replace
       (error "[alien-search] No `:script-replace' or `:cmd-path-replace'!"))
   (or script-occur
       cmd-path-occur
       (error "[alien-search] No `:script-occur' or `:cmd-path-occur'!"))
-  (or script-isearch
-      cmd-path-isearch
-      (error "[alien-search] No `:cmd-path-isearch' or `:cmd-path-isearch'!"))
   (or script-quote-meta
       cmd-path-quote-meta
       (error "[alien-search] No `:script-quote-meta' or `:cmd-path-quote-meta'!"))
-  (or script-quote-meta
-      cmd-path-quote-meta
-      (error "[alien-search] No `:script-quote-meta' or `:cmd-path-quote-meta'!"))
-  (or script-re-builder
-      cmd-path-re-builder
-      (error "[alien-search] No `:script-re-builder' or `:cmd-path-re-builder'!"))
 
   (alien-search/alien-type/forget name)
   (push (list name
@@ -3628,16 +3637,14 @@ Arguments are:
               :indicator-dot-match     indicator-dot-match
               :indicator-no-dot-match  indicator-no-dot-match
               :indicator-separator     indicator-separator
+              :script-search           script-search
               :script-replace          script-replace
               :script-occur            script-occur
-              :script-isearch          script-isearch
               :script-quote-meta       script-quote-meta
-              :script-re-builder       script-re-builder
+              :cmd-path-search         cmd-path-search
               :cmd-path-replace        cmd-path-replace
               :cmd-path-occur          cmd-path-occur
-              :cmd-path-isearch        cmd-path-isearch
-              :cmd-path-quote-meta     cmd-path-quote-meta
-              :cmd-path-re-builder     cmd-path-re-builder)
+              :cmd-path-quote-meta     cmd-path-quote-meta)
         alien-search/alien-type/.type-alst)
 
   (alien-search/alien-type/custom-widget/alien-type-selector/update))
@@ -3687,16 +3694,14 @@ Arguments are:
     (setq alien-search/search-option-indicator/dot-match-str    (cadr (memq :indicator-dot-match    kv-lst)))
     (setq alien-search/search-option-indicator/no-dot-match-str (cadr (memq :indicator-no-dot-match kv-lst)))
     (setq alien-search/search-option-indicator/separator-str    (cadr (memq :indicator-separator    kv-lst)))
+    (setq alien-search/search/external-program                  (cadr (memq :cmd-path-search        kv-lst)))
+    (setq alien-search/search/shell-script                      (cadr (memq :script-search          kv-lst)))
     (setq alien-search/replace/external-program                 (cadr (memq :cmd-path-replace       kv-lst)))
     (setq alien-search/replace/shell-script                     (cadr (memq :script-replace         kv-lst)))
     (setq alien-search/occur/external-program                   (cadr (memq :cmd-path-occur         kv-lst)))
     (setq alien-search/occur/shell-script                       (cadr (memq :script-occur           kv-lst)))
-    (setq alien-search/isearch/external-program                 (cadr (memq :cmd-path-isearch       kv-lst)))
-    (setq alien-search/isearch/shell-script                     (cadr (memq :script-isearch         kv-lst)))
     (setq alien-search/quote-meta/external-program              (cadr (memq :cmd-path-quote-meta    kv-lst)))
     (setq alien-search/quote-meta/shell-script                  (cadr (memq :script-quote-meta      kv-lst)))
-    (setq alien-search/re-builder/external-program              (cadr (memq :cmd-path-re-builder    kv-lst)))
-    (setq alien-search/re-builder/shell-script                  (cadr (memq :script-re-builder      kv-lst)))
 
     (setq alien-search/alien-type name)
     (cond
