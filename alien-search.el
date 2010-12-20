@@ -688,7 +688,7 @@ This is a side effect free version of `ad-activate'."
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/read-from-minibuf/with-search-option-indicator &rest body)
-;;                                                           => RESULT OF BODY
+;;                                                       => RESULT OF BODYFORM
 ;; ----------------------------------------------------------------------------
 (defmacro alien-search/read-from-minibuf/with-search-option-indicator (&rest body)
   "Run body with search option indicator on prompt of `read-from-minibuffer'. "
@@ -1581,7 +1581,7 @@ alien-search/replace/replacement."
 
 ;;; ===========================================================================
 ;;;
-;;;  `occur' with a help from external program.
+;;;  `occur' by alien regexp with a help from external program.
 ;;;
 ;;; ===========================================================================
 
@@ -1932,7 +1932,7 @@ when it has nil value.")
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/search/with-regarding-string-as-alien-regexp
-;;                      (string &optional limit) &rest body) => RESULT OF BODY
+;;                  (string &optional limit) &rest body) => RESULT OF BODYFORM
 ;; ----------------------------------------------------------------------------
 (defmacro alien-search/search/with-regarding-string-as-alien-regexp (args &rest body)
   "Run BODY with applying `alien-search/search/forward' and
@@ -2263,7 +2263,7 @@ in BUF for REGEXP by external program."
   
 ;;; ===========================================================================
 ;;;
-;;;  `isearch' with a help from external program.
+;;;  `isearch' for alien regexp with a help from external program.
 ;;;
 ;;; ===========================================================================
 
@@ -2447,7 +2447,7 @@ for isearch to use."
 
 ;;; ===========================================================================
 ;;;
-;;;  quote meta characters by external program.
+;;;  quote meta characters of alien regexp by external program.
 ;;;
 ;;; ===========================================================================
 
@@ -2521,14 +2521,14 @@ when it has nil value.")
 
 ;;; ===========================================================================
 ;;;
-;;;  `re-builder' with a help from external program.
+;;;  `re-builder' in alien regexp with a help from external program.
 ;;;
 ;;; ===========================================================================
 (require 're-builder)
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/exec-with-current-re re-var &rest body)
-;;                                                         => RESULT FROM BODY
+;;                                                     => RESULT FROM BODYFORM
 ;; ----------------------------------------------------------------------------
 (defmacro alien-search/re-builder/exec-with-current-re (re-var &rest body)
   "When the current buffer is *RE-Builder*, exit `re-builder'
@@ -2974,7 +2974,7 @@ to each search option changed hook."
 
 ;;; ===========================================================================
 ;;;
-;;;  Non-incremental search with a help from external program.
+;;;  Non-incremental search for alien regexp with a help from external program.
 ;;;
 ;;; ===========================================================================
 
