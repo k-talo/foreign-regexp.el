@@ -418,12 +418,12 @@ See also the function `throw' for more info."
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/run-external-program prog-path shell-script body
-;;                                     pattern replacement &rest other-args)
+;;                                     regexp replacement &rest other-args)
 ;;                                                                   => RESULT
 ;; ----------------------------------------------------------------------------
 (defun alien-search/run-external-program (prog-path shell-script
                                                     body
-                                                    pattern
+                                                    regexp
                                                     replacement
                                                     &rest other-args)
   "Run external program to execute operations regarding to search.
@@ -434,7 +434,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                               alien-search/tmp-file-prefix
                               alien-search/tmp-dir))
          (fn-out-body        (make-temp-name base))
-         (fn-out-pattern     (make-temp-name base))
+         (fn-out-regexp      (make-temp-name base))
          (fn-out-replacement (make-temp-name base))
          (fn-in-result       (make-temp-name base))
          (fn-program         (make-temp-name base))
@@ -460,9 +460,9 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                   (with-temp-file fn-out-body
                     (set-buffer-file-coding-system coding-sys-out)
                     (insert body)))
-                (with-temp-file fn-out-pattern
+                (with-temp-file fn-out-regexp
                   (set-buffer-file-coding-system coding-sys-out)
-                  (insert pattern))
+                  (insert regexp))
                 (when replacement
                   (with-temp-file fn-out-replacement
                     (set-buffer-file-coding-system coding-sys-out)
@@ -485,7 +485,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                                  nil ,(buffer-name proc-output-buf) nil
                                  ,@(if body (list fn-out-body) nil)
                                  ,fn-in-result
-                                 ,fn-out-pattern
+                                 ,fn-out-regexp
                                  ,@(if replacement (list fn-out-replacement) nil)
                                  ,@other-args))))
             (when (not (and (numberp status)
@@ -510,7 +510,7 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           result)
       
       ;; Cleanup.
-      (and (file-exists-p fn-out-pattern    ) (delete-file fn-out-pattern    ))
+      (and (file-exists-p fn-out-regexp     ) (delete-file fn-out-regexp     ))
       (and (file-exists-p fn-out-replacement) (delete-file fn-out-replacement))
       (and (file-exists-p fn-out-body       ) (delete-file fn-out-body       ))
       (and (file-exists-p fn-in-result      ) (delete-file fn-in-result      ))
@@ -977,8 +977,8 @@ Seven arguments describe below will be passed to the program.
       The text in this file must be encoded in the value of
       `alien-search/input-coding-system'.
 
- 3rd: Path of a file in which the pattern we want to search is written.
-      The program have a responsibility to search this pattern
+ 3rd: Path of a file in which the regexp we want to search is written.
+      The program have a responsibility to search this regexp
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -1003,7 +1003,7 @@ Seven arguments describe below will be passed to the program.
 
  7th: An extended regular expression flag.
       When the value of this flag is not empty string,
-      the current search pattern(:see 3rd arg) should be
+      the current search regexp (see 3rd arg) should be
       interpreted as extended regular expression.")
 
 (defvar alien-search/replace/shell-script nil
@@ -1025,10 +1025,10 @@ See also `query-replace-defaults'.")
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/query-replace pattern replacement
+;;  (alien-search/query-replace regexp replacement
 ;;                              &optional delimited start end) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/query-replace (pattern replacement &optional delimited start end)
+(defun alien-search/query-replace (regexp replacement &optional delimited start end)
   "Do `query-replace' with a help from external program.
 
 See `isearch-forward-regexp' and `isearch-backward-regexp' for
@@ -1056,7 +1056,7 @@ more information."
                 (region-end))))))
   (alien-search/replace/assert-available)
   (alien-search/replace/perform-replace
-   pattern replacement t nil nil nil nil start end))
+   regexp replacement t nil nil nil nil start end))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1082,12 +1082,12 @@ more information."
       (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/replace/search-by-external-program pattern replacement)
+;;  (alien-search/replace/search-by-external-program regexp replacement)
 ;;                                                                     => LIST
 ;; ----------------------------------------------------------------------------
-(defun alien-search/replace/search-by-external-program (pattern replacement min max)
+(defun alien-search/replace/search-by-external-program (regexp replacement min max)
   "Scan current buffer with external program to detect matching
-texts by PATTERN.
+texts by REGEXP.
 
 Overlays will be made on each matched text, and they will be
 saved to the variable `alien-search/replace/ovs-on-match/data'.
@@ -1103,7 +1103,7 @@ the list `alien-search/replace/ovs-on-match/data'."
                   alien-search/replace/external-program
                   alien-search/replace/shell-script
                   (buffer-substring (point-min) (point-max))
-                  pattern
+                  regexp
                   replacement
                   (if alien-search/dot-match-a-newline-p "DOT" "")
                   (if case-fold-search "" "CASE")
@@ -1608,8 +1608,8 @@ Six arguments describe below will be passed to the program.
       The text in this file must be encoded in the value of
       `alien-search/input-coding-system'.
 
- 3rd: Path of a file in which the pattern we want to search is written.
-      The program have a responsibility to search this pattern
+ 3rd: Path of a file in which the regexp we want to search is written.
+      The program have a responsibility to search this regexp
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -1626,7 +1626,7 @@ Six arguments describe below will be passed to the program.
 
  6th: An extended regular expression flag.
       When the value of this flag is not empty string,
-      the current search pattern(:see 3rd arg) should be
+      the current search regexp (see 3rd arg) should be
       interpreted as extended regular expression.")
 
 (defvar alien-search/occur/shell-script nil
@@ -1876,8 +1876,8 @@ Seven arguments describe below will be passed to the program.
       The text in this file must be encoded in the value of
       `alien-search/input-coding-system'.
 
- 3rd: Path of a file in which the pattern we want to search is written.
-      The program have a responsibility to search this pattern
+ 3rd: Path of a file in which the regexp we want to search is written.
+      The program have a responsibility to search this regexp
       from the file specified by 1st argument, then write start and
       end positions of each match to the file specified by 2nd argument.
 
@@ -1894,7 +1894,7 @@ Seven arguments describe below will be passed to the program.
 
  6th: An extended regular expression flag.
       When the value of this flag is not empty string,
-      the current search pattern(:see 3rd arg) should be
+      the current search regexp (see 3rd arg) should be
       interpreted as extended regular expression.
 
  7th: Positive integer when we want limit the matches, or empty
@@ -2451,7 +2451,7 @@ Two arguments describe below will be passed to the program.
       The text in this file must be encoded in the value of
       `alien-search/input-coding-system'.
 
- 2nd: Path of a file in which the pattern, we want to quote meta
+ 2nd: Path of a file in which the regexp, we want to quote meta
       characters in it, is written.
 
       The text in this file is encoded in the value of
@@ -2505,10 +2505,10 @@ when it has nil value.")
       (error "[alien-search] No external program or shell script is defined.")))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/quote-meta pattern) => VOID
+;;  (alien-search/quote-meta regexp) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/quote-meta (pattern)
-  "Quote meta characters in a PATTERN in manner of external program."
+(defun alien-search/quote-meta (regexp)
+  "Quote meta characters in a REGEXP in manner of external program."
   (interactive)
   (alien-search/quote-meta/assert-available)
   
@@ -2516,7 +2516,7 @@ when it has nil value.")
    alien-search/quote-meta/external-program
    alien-search/quote-meta/shell-script
    nil ;; Don't care about text in current buffer.
-   pattern
+   regexp
    nil))
 
 
