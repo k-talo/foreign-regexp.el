@@ -2465,6 +2465,25 @@ when it has nil value.")
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/quote-meta-in-region beg end) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/quote-meta-in-region (beg end)
+  "Quote meta characters in region in manner of external program."
+  (interactive "r")
+  (save-excursion
+    (let ((quoted-str (alien-search/quote-meta
+                       (buffer-substring-no-properties beg end))))
+      (delete-region beg end)
+      (goto-char beg)
+      (insert quoted-str))))
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
