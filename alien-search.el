@@ -236,17 +236,13 @@
   :type 'string
   :group 'alien-search)
 
-(defcustom alien-search/input-coding-system  'utf-8-unix
+(defvar alien-search/input-coding-system  'utf-8-unix
   "Coding system to be used for decoding files which
-contains texts passed from external programs to Emacs."
-  :type  'coding-system
-  :group 'alien-search)
+contains texts passed from external programs to Emacs.")
 
-(defcustom alien-search/output-coding-system 'utf-8-unix
+(defvar alien-search/output-coding-system 'utf-8-unix
   "Coding system to be used for encoding files which
-contains texts passed from Emacs to external programs."
-  :type  'coding-system
-  :group 'alien-search)
+contains texts passed from Emacs to external programs.")
 
 (defvar alien-search/history  nil
   "History list for some commands that runs alien-search.")
@@ -585,46 +581,32 @@ This is a side effect free version of `ad-activate'."
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/search-option-indicator/case-fold-str ""
+(defvar alien-search/search-option-indicator/case-fold-str ""
   "A string displayed when the search option
-`case-fold-search' is on."
-  :type 'string
-  :group 'alien-search)
+`case-fold-search' is on.")
 
-(defcustom alien-search/search-option-indicator/no-case-fold-str "Case"
+(defvar alien-search/search-option-indicator/no-case-fold-str "Case"
   "A string displayed when the search option
-`case-fold-search' is off."
-  :type 'string
-  :group 'alien-search)
+`case-fold-search' is off.")
 
-(defcustom alien-search/search-option-indicator/dot-match-str ".=~\\n"
+(defvar alien-search/search-option-indicator/dot-match-str ".=~\\n"
   "A string displayed when the search option
-`alien-search/dot-match-a-newline-p' is on."
-  :type 'string
-  :group 'alien-search)
+`alien-search/dot-match-a-newline-p' is on.")
 
-(defcustom alien-search/search-option-indicator/no-dot-match-str ""
+(defvar alien-search/search-option-indicator/no-dot-match-str ""
   "A string displayed when the search option
-`alien-search/dot-match-a-newline-p' is off."
-  :type 'string
-  :group 'alien-search)
+`alien-search/dot-match-a-newline-p' is off.")
 
-(defcustom alien-search/search-option-indicator/ext-regexp-str "Ext"
+(defvar alien-search/search-option-indicator/ext-regexp-str "Ext"
   "A string displayed when the search option
-`alien-search/use-extended-regexp-p' is on."
-  :type 'string
-  :group 'alien-search)
+`alien-search/use-extended-regexp-p' is on.")
 
-(defcustom alien-search/search-option-indicator/no-ext-regex-str ""
+(defvar alien-search/search-option-indicator/no-ext-regex-str ""
   "A string displayed when the search option
-`alien-search/use-extended-regexp-p' is off."
-  :type 'string
-  :group 'alien-search)
+`alien-search/use-extended-regexp-p' is off.")
 
-(defcustom alien-search/search-option-indicator/separator-str " "
-  "A string displayed between search option strings."
-  :type 'string
-  :group 'alien-search)
+(defvar alien-search/search-option-indicator/separator-str " "
+  "A string displayed between search option strings.")
 
 
 ;; ----------------------------------------------------------------------------
