@@ -601,7 +601,7 @@ This is a side effect free version of `ad-activate'."
   "A string displayed when the search option
 `alien-search/use-extended-regexp-p' is on.")
 
-(defvar alien-search/search-option-indicator/no-ext-regex-str ""
+(defvar alien-search/search-option-indicator/no-ext-regexp-str ""
   "A string displayed when the search option
 `alien-search/use-extended-regexp-p' is off.")
 
@@ -653,7 +653,7 @@ This is a side effect free version of `ad-activate'."
                   alien-search/search-option-indicator/no-dot-match-str)
                 (if alien-search/use-extended-regexp-p
                     alien-search/search-option-indicator/ext-regexp-str 
-                  alien-search/search-option-indicator/no-ext-regex-str))))
+                  alien-search/search-option-indicator/no-ext-regexp-str))))
 
 
 ;;; ===========================================================================
@@ -3503,7 +3503,7 @@ as the value of a tag."
 ;;                                       indicator-case-fold
 ;;                                       indicator-no-case-fold
 ;;                                       indicator-ext-regexp
-;;                                       indicator-no-ext-regex
+;;                                       indicator-no-ext-regexp
 ;;                                       indicator-dot-match
 ;;                                       indicator-no-dot-match
 ;;                                       indicator-separator
@@ -3523,7 +3523,7 @@ as the value of a tag."
                                              indicator-case-fold
                                              indicator-no-case-fold
                                              indicator-ext-regexp
-                                             indicator-no-ext-regex
+                                             indicator-no-ext-regexp
                                              indicator-dot-match
                                              indicator-no-dot-match
                                              indicator-separator
@@ -3570,7 +3570,7 @@ Arguments are:
         See `alien-search/search-option-indicator/ext-regexp-str'.
       
   INDICATOR-NO-EXT-REGEX:
-        See `alien-search/search-option-indicator/no-ext-regex-str'.
+        See `alien-search/search-option-indicator/no-ext-regexp-str'.
       
   INDICATOR-SEPARATOR:
         See `alien-search/search-option-indicator/separator-str'.
@@ -3600,17 +3600,17 @@ Arguments are:
         See `alien-search/quote-meta/shell-script'."
   ;; Validation
   ;;
-  (or name                   (error "[alien-search] No `:name'!"))
-  (or tag                    (error "[alien-search] No `:tag'!"))
-  (or input-coding-system    (error "[alien-search] No `:input-coding-system'!"))
-  (or output-coding-system   (error "[alien-search] No `:output-coding-system'!"))
-  (or indicator-case-fold    (error "[alien-search] No `:indicator-case-fold'!"))
-  (or indicator-no-case-fold (error "[alien-search] No `:indicator-no-case-fold'!"))
-  (or indicator-ext-regexp   (error "[alien-search] No `:indicator-ext-regexp'!"))
-  (or indicator-no-ext-regex (error "[alien-search] No `:indicator-no-ext-regex'!"))
-  (or indicator-dot-match    (error "[alien-search] No `:indicator-dot-match'!"))
-  (or indicator-no-dot-match (error "[alien-search] No `:indicator-no-dot-match'!"))
-  (or indicator-separator    (error "[alien-search] No `:indicator-separator'!"))
+  (or name                    (error "[alien-search] No `:name'!"))
+  (or tag                     (error "[alien-search] No `:tag'!"))
+  (or input-coding-system     (error "[alien-search] No `:input-coding-system'!"))
+  (or output-coding-system    (error "[alien-search] No `:output-coding-system'!"))
+  (or indicator-case-fold     (error "[alien-search] No `:indicator-case-fold'!"))
+  (or indicator-no-case-fold  (error "[alien-search] No `:indicator-no-case-fold'!"))
+  (or indicator-ext-regexp    (error "[alien-search] No `:indicator-ext-regexp'!"))
+  (or indicator-no-ext-regexp (error "[alien-search] No `:indicator-no-ext-regexp'!"))
+  (or indicator-dot-match     (error "[alien-search] No `:indicator-dot-match'!"))
+  (or indicator-no-dot-match  (error "[alien-search] No `:indicator-no-dot-match'!"))
+  (or indicator-separator     (error "[alien-search] No `:indicator-separator'!"))
 
   (or script-search
       cmd-path-search
@@ -3627,25 +3627,25 @@ Arguments are:
 
   (alien-search/alien-type/forget name)
   (push (list name
-              :name                    name
-              :tag                     tag
-              :input-coding-system     input-coding-system
-              :output-coding-system    output-coding-system
-              :indicator-case-fold     indicator-case-fold
-              :indicator-no-case-fold  indicator-no-case-fold
-              :indicator-ext-regexp    indicator-ext-regexp
-              :indicator-no-ext-regex  indicator-no-ext-regex
-              :indicator-dot-match     indicator-dot-match
-              :indicator-no-dot-match  indicator-no-dot-match
-              :indicator-separator     indicator-separator
-              :script-search           script-search
-              :script-replace          script-replace
-              :script-occur            script-occur
-              :script-quote-meta       script-quote-meta
-              :cmd-path-search         cmd-path-search
-              :cmd-path-replace        cmd-path-replace
-              :cmd-path-occur          cmd-path-occur
-              :cmd-path-quote-meta     cmd-path-quote-meta)
+              :name                     name
+              :tag                      tag
+              :input-coding-system      input-coding-system
+              :output-coding-system     output-coding-system
+              :indicator-case-fold      indicator-case-fold
+              :indicator-no-case-fold   indicator-no-case-fold
+              :indicator-ext-regexp     indicator-ext-regexp
+              :indicator-no-ext-regexp  indicator-no-ext-regexp
+              :indicator-dot-match      indicator-dot-match
+              :indicator-no-dot-match   indicator-no-dot-match
+              :indicator-separator      indicator-separator
+              :script-search            script-search
+              :script-replace           script-replace
+              :script-occur             script-occur
+              :script-quote-meta        script-quote-meta
+              :cmd-path-search          cmd-path-search
+              :cmd-path-replace         cmd-path-replace
+              :cmd-path-occur           cmd-path-occur
+              :cmd-path-quote-meta      cmd-path-quote-meta)
         alien-search/alien-type/.type-alst)
 
   (alien-search/alien-type/custom-widget/alien-type-selector/update))
@@ -3686,23 +3686,23 @@ Arguments are:
                       nil)
                      (t
                       (error "No such alien definition `%s'." name))))))
-    (setq alien-search/input-coding-system                      (cadr (memq :input-coding-system    kv-lst)))
-    (setq alien-search/output-coding-system                     (cadr (memq :output-coding-system   kv-lst)))
-    (setq alien-search/search-option-indicator/case-fold-str    (cadr (memq :indicator-case-fold    kv-lst)))
-    (setq alien-search/search-option-indicator/no-case-fold-str (cadr (memq :indicator-no-case-fold kv-lst)))
-    (setq alien-search/search-option-indicator/ext-regexp-str   (cadr (memq :indicator-ext-regexp   kv-lst)))
-    (setq alien-search/search-option-indicator/no-ext-regex-str (cadr (memq :indicator-no-ext-regex kv-lst)))
-    (setq alien-search/search-option-indicator/dot-match-str    (cadr (memq :indicator-dot-match    kv-lst)))
-    (setq alien-search/search-option-indicator/no-dot-match-str (cadr (memq :indicator-no-dot-match kv-lst)))
-    (setq alien-search/search-option-indicator/separator-str    (cadr (memq :indicator-separator    kv-lst)))
-    (setq alien-search/search/external-command                  (cadr (memq :cmd-path-search        kv-lst)))
-    (setq alien-search/search/shell-script                      (cadr (memq :script-search          kv-lst)))
-    (setq alien-search/replace/external-command                 (cadr (memq :cmd-path-replace       kv-lst)))
-    (setq alien-search/replace/shell-script                     (cadr (memq :script-replace         kv-lst)))
-    (setq alien-search/occur/external-command                   (cadr (memq :cmd-path-occur         kv-lst)))
-    (setq alien-search/occur/shell-script                       (cadr (memq :script-occur           kv-lst)))
-    (setq alien-search/quote-meta/external-command              (cadr (memq :cmd-path-quote-meta    kv-lst)))
-    (setq alien-search/quote-meta/shell-script                  (cadr (memq :script-quote-meta      kv-lst)))
+    (setq alien-search/input-coding-system                       (cadr (memq :input-coding-system    kv-lst)))
+    (setq alien-search/output-coding-system                      (cadr (memq :output-coding-system   kv-lst)))
+    (setq alien-search/search-option-indicator/case-fold-str     (cadr (memq :indicator-case-fold    kv-lst)))
+    (setq alien-search/search-option-indicator/no-case-fold-str  (cadr (memq :indicator-no-case-fold kv-lst)))
+    (setq alien-search/search-option-indicator/ext-regexp-str    (cadr (memq :indicator-ext-regexp   kv-lst)))
+    (setq alien-search/search-option-indicator/no-ext-regexp-str (cadr (memq :indicator-no-ext-regexp kv-lst)))
+    (setq alien-search/search-option-indicator/dot-match-str     (cadr (memq :indicator-dot-match    kv-lst)))
+    (setq alien-search/search-option-indicator/no-dot-match-str  (cadr (memq :indicator-no-dot-match kv-lst)))
+    (setq alien-search/search-option-indicator/separator-str     (cadr (memq :indicator-separator    kv-lst)))
+    (setq alien-search/search/external-command                   (cadr (memq :cmd-path-search        kv-lst)))
+    (setq alien-search/search/shell-script                       (cadr (memq :script-search          kv-lst)))
+    (setq alien-search/replace/external-command                  (cadr (memq :cmd-path-replace       kv-lst)))
+    (setq alien-search/replace/shell-script                      (cadr (memq :script-replace         kv-lst)))
+    (setq alien-search/occur/external-command                    (cadr (memq :cmd-path-occur         kv-lst)))
+    (setq alien-search/occur/shell-script                        (cadr (memq :script-occur           kv-lst)))
+    (setq alien-search/quote-meta/external-command               (cadr (memq :cmd-path-quote-meta    kv-lst)))
+    (setq alien-search/quote-meta/shell-script                   (cadr (memq :script-quote-meta      kv-lst)))
 
     (setq alien-search/alien-type name)
     (cond
