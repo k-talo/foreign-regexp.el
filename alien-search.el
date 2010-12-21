@@ -1074,12 +1074,12 @@ more information."
       alien-search/replace/shell-script))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/replace/assert-available) => BOOL or ERROR
+;;  (alien-search/replace/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defun alien-search/replace/assert-available ()
   "Raise error when no external command or shell script is defined."
   (or (alien-search/replace/available-p)
-      (error "[alien-search] No external command or shell script is defined.")))
+      (error "[alien-search] No external command or shell script is defined for replace.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/replace/search-by-external-command regexp replacement)
@@ -1678,12 +1678,12 @@ when it has nil value.")
       alien-search/occur/shell-script))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/occur/assert-available) => BOOL or ERROR
+;;  (alien-search/occur/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defun alien-search/occur/assert-available ()
   "Raise error when no external command or shell script is defined."
   (or (alien-search/occur/available-p)
-      (error "[alien-search] No external command or shell script is defined.")))
+      (error "[alien-search] No external command or shell script is defined for occur.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/occur-read-primary-args) => LIST
@@ -2077,12 +2077,12 @@ See also `re-search-backward'."
       alien-search/search/shell-script))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/search/assert-available) => BOOL or ERROR
+;;  (alien-search/search/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defun alien-search/search/assert-available ()
   "Raise error when no external command or shell script is defined."
   (or (alien-search/search/available-p)
-      (error "[alien-search] No external command or shell script is defined.")))
+      (error "[alien-search] No external command or shell script is defined for search.")))
 
 
 ;;; ===========================================================================
@@ -2347,7 +2347,7 @@ more information."
 (defalias 'alien-search/isearch/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/isearch/assert-available) => BOOL or ERROR
+;;  (alien-search/isearch/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defalias 'alien-search/isearch/assert-available 'alien-search/search/assert-available)
 
@@ -2497,12 +2497,12 @@ when it has nil value.")
       alien-search/quote-meta/shell-script))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/quote-meta/assert-available) => BOOL or ERROR
+;;  (alien-search/quote-meta/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defun alien-search/quote-meta/assert-available ()
   "Raise error when no external command or shell script is defined."
   (or (alien-search/quote-meta/available-p)
-      (error "[alien-search] No external command or shell script is defined.")))
+      (error "[alien-search] No external command or shell script is defined for quote-meta.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/quote-meta regexp) => VOID
@@ -2874,7 +2874,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defalias 'alien-search/re-builder/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/assert-available) => BOOL or ERROR
+;;  (alien-search/re-builder/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defalias 'alien-search/re-builder/assert-available 'alien-search/search/assert-available)
 
@@ -3068,7 +3068,7 @@ to each search option changed hook."
 (defalias 'alien-search/non-incremental/available-p 'alien-search/search/available-p)
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/non-incremental/assert-available) => BOOL or ERROR
+;;  (alien-search/non-incremental/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
 (defalias 'alien-search/non-incremental/assert-available 'alien-search/search/assert-available)
 
