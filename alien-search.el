@@ -2662,7 +2662,9 @@ current RE on `reb-target-buffer'."
   (alien-search/non-incremental/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
-    (alien-search/non-incremental/search-forward regexp)))
+    (alien-search/read-from-minibuf/with-initial-contents regexp
+      (let ((this-command 'alien-search/non-incremental/search-forward))
+        (call-interactively 'alien-search/non-incremental/search-forward)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
@@ -2676,7 +2678,9 @@ current RE on `reb-target-buffer'."
   (alien-search/non-incremental/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
-    (alien-search/non-incremental/search-forward regexp)))
+    (alien-search/read-from-minibuf/with-initial-contents regexp
+      (let ((this-command 'alien-search/non-incremental/search-backward))
+        (call-interactively 'alien-search/non-incremental/search-backward)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/toggle-case-fold-on-target-buffer
