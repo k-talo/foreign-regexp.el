@@ -682,6 +682,24 @@ This is a side effect free version of `ad-activate'."
      (alien-search/ad-disable 'read-from-minibuffer 'around 'alien-search/read-from-minibuf/with-search-option-indicator)
      (alien-search/ad-activate 'read-from-minibuffer)))
 
+;; ----------------------------------------------------------------------------
+;;  (alien-search/read-from-minibuf/with-initial-contents
+;;                          initial-contents &rest body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/read-from-minibuf/with-initial-contents (initial-contents &rest body)
+  "Run body with setting initial contents to `read-from-minibuffer'."
+  (declare (indent 1))
+  ;; Set initial contents for `read-from-minibuffer'.
+  `(unwind-protect
+       (progn
+         (alien-search/ad-enable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
+         (alien-search/ad-activate 'read-from-minibuffer)
+         (let ((alien-search/.initial-contents ,initial-contents))
+           ,@body))
+     (alien-search/ad-disable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
+     (alien-search/ad-activate 'read-from-minibuffer)))
+
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2573,17 +2591,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (when (match-beginning 0)
       (goto-char (match-beginning 0)))
     
-    (unwind-protect
-        (progn
-          ;; Set initial contents for `read-from-minibuffer'.
-          (alien-search/ad-enable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
-          (alien-search/ad-activate 'read-from-minibuffer)
-          
-          (let ((alien-search/.initial-contents regexp)
-                (this-command 'alien-search/query-replace)) ;; For read-from-minibuffer
-            (call-interactively 'alien-search/query-replace)))
-      (alien-search/ad-disable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
-      (alien-search/ad-activate 'read-from-minibuffer))))
+    (alien-search/read-from-minibuf/with-initial-contents regexp
+      (let ((this-command 'alien-search/query-replace))
+        (call-interactively 'alien-search/query-replace)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/occur-on-target-buffer) => VOID
@@ -2596,17 +2606,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
   (alien-search/occur/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
-    (unwind-protect
-        (progn
-          ;; Set initial contents for `read-from-minibuffer'.
-          (alien-search/ad-enable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
-          (alien-search/ad-activate 'read-from-minibuffer)
-          
-          (let ((alien-search/.initial-contents regexp)
-                (this-command 'alien-search/occur)) ;; For read-from-minibuffer
-            (call-interactively 'alien-search/occur)))
-      (alien-search/ad-disable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
-      (alien-search/ad-activate 'read-from-minibuffer))))
+    (alien-search/read-from-minibuf/with-initial-contents regexp
+      (let ((this-command 'alien-search/occur))
+        (call-interactively 'alien-search/occur)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/isearch-forward-on-target-buffer) => VOID
@@ -3207,22 +3209,12 @@ transition to another alien-search command."
                                `((run-with-idle-timer
                                   0 nil
                                   (lambda ()
-                                    ;; Set initial contents for `read-from-minibuffer',
-                                    ;; then call another alien-search command.
-                                    (unwind-protect
-                                        (progn
-                                          (alien-search/ad-enable 'read-from-minibuffer
-                                                                  'before
-                                                                  'alien-search/read-from-minibuf/with-initial-contents)
-                                          (alien-search/ad-activate 'read-from-minibuffer)
-                                        
-                                          (let ((alien-search/.initial-contents regexp)
-                                                (this-command (quote ,targ-command)))
-                                            (call-interactively (quote ,targ-command))))
-                                      (alien-search/ad-disable 'read-from-minibuffer
-                                                               'before
-                                                               'alien-search/read-from-minibuf/with-initial-contents)
-                                      (alien-search/ad-activate 'read-from-minibuffer))))))))))
+                                    ;; Call another alien-search command with setting
+                                    ;; initial contents to `read-from-minibuffer'.
+                                    (alien-search/read-from-minibuf/with-initial-contents
+                                        regexp
+                                      (let ((this-command (quote ,targ-command)))
+                                        (call-interactively (quote ,targ-command))))))))))))
                     ;; Should be turned on by `isearch-mode-hook'.
                     (alien-search/ad-disable (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
                     (alien-search/ad-activate (quote ,targ-command))
@@ -3393,22 +3385,12 @@ while this function is running."
                                       `((run-with-idle-timer
                                          0 nil
                                          (lambda ()
-                                           (unwind-protect
-                                               ;; Set initial contents for `read-from-minibuffer',
-                                               ;; then call another alien-search command.
-                                               (progn
-                                                 (alien-search/ad-enable 'read-from-minibuffer
-                                                                         'before
-                                                                         'alien-search/read-from-minibuf/with-initial-contents)
-                                                 (alien-search/ad-activate 'read-from-minibuffer)
-                                                 
-                                                 (let ((alien-search/.initial-contents regexp)
-                                                       (this-command (quote ,targ-command)))
-                                                   (call-interactively (quote ,targ-command))))
-                                             (alien-search/ad-disable 'read-from-minibuffer
-                                                                      'before
-                                                                      'alien-search/read-from-minibuf/with-initial-contents)
-                                             (alien-search/ad-activate 'read-from-minibuffer)))))))
+                                           ;; Call another alien-search command with setting
+                                           ;; initial contents to `read-from-minibuffer'.
+                                           (alien-search/read-from-minibuf/with-initial-contents
+                                               regexp
+                                             (let ((this-command (quote ,targ-command)))
+                                               (call-interactively (quote ,targ-command)))))))))
                                  ;; FIXME: Turn off an annoying message
                                  ;;        "Back to top level.".
                                  (top-level)))))
