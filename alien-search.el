@@ -2565,6 +2565,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/query-replace-on-target-buffer ()
   "Run `alien-search/query-replace' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/replace/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2589,6 +2590,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/occur-on-target-buffer ()
   "Run `alien-search/occur' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/occur/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2610,6 +2612,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/isearch-forward-on-target-buffer ()
   "Run `alien-search/isearch-forward' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/isearch/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2628,6 +2631,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/isearch-backward-on-target-buffer ()
   "Run `alien-search/isearch-backward' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/isearch/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2647,6 +2651,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/non-incremental-search-forward-on-target-buffer ()
   "Run `alien-search/non-incremental/search-forward' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/non-incremental/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2659,6 +2664,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/non-incremental-search-backward-on-target-buffer ()
   "Run `alien-search/non-incremental/search-backward' with current RE."
   (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
   (alien-search/non-incremental/assert-available)
   
   (alien-search/re-builder/exec-with-current-re regexp
@@ -2671,12 +2677,10 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/toggle-case-fold-on-target-buffer (&optional no-message)
   "Toggle `case-fold-search' on `reb-target-buffer'."
   (interactive)
-  (cond
-   (reb-target-buffer
-    (with-current-buffer reb-target-buffer
-      (alien-search/toggle-case-fold no-message)))
-   (t
-    (error "[alien-search] No `reb-target-buffer'."))))
+  (alien-search/re-builder/assert-in-reb-buffer)
+  
+  (with-current-buffer reb-target-buffer
+    (alien-search/toggle-case-fold no-message)))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/toggle-dot-match-on-target-buffer
@@ -2685,12 +2689,10 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/toggle-dot-match-on-target-buffer (&optional no-message)
   "Toggle `alien-search/dot-match-a-newline-p' on `reb-target-buffer'."
   (interactive)
-  (cond
-   (reb-target-buffer
-    (with-current-buffer reb-target-buffer
-      (alien-search/toggle-dot-match no-message)))
-   (t
-    (error "[alien-search] No `reb-target-buffer'."))))
+  (alien-search/re-builder/assert-in-reb-buffer)
+  
+  (with-current-buffer reb-target-buffer
+    (alien-search/toggle-dot-match no-message)))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/toggle-ext-regexp-on-target-buffer
@@ -2699,12 +2701,10 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 (defun alien-search/re-builder/toggle-ext-regexp-on-target-buffer (&optional no-message)
   "Toggle `alien-search/use-extended-regexp-p' on `reb-target-buffer'."
   (interactive)
-  (cond
-   (reb-target-buffer
-    (with-current-buffer reb-target-buffer
-      (alien-search/toggle-ext-regexp no-message)))
-   (t
-    (error "[alien-search] No `reb-target-buffer'."))))
+  (alien-search/re-builder/assert-in-reb-buffer)
+  
+  (with-current-buffer reb-target-buffer
+    (alien-search/toggle-ext-regexp no-message)))
 
 
 ;; ----------------------------------------------------------------------------
@@ -2860,6 +2860,13 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/assert-in-reb-buffer) => VOID OR ERROR
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/assert-in-reb-buffer ()
+  (when (not (reb-mode-buffer-p))
+    (error "[alien-search] Not in *RE-Builder* buffer.")))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/available-p) => BOOL
