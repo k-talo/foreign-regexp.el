@@ -780,8 +780,8 @@ to INITIAL-CONTENTS of `read-from-minibuffer'.
 Value should be assigned to `alien-search/.initial-contents'
 by caller function with `LET' form.
 
-This advice will be enabled by `alien-search/re-builder/run-query-replace'
-and `alien-search/re-builder/run-occur'."
+This advice will be enabled by `alien-search/re-builder/query-replace-on-target-buffer'
+and `alien-search/re-builder/occur-on-target-buffer'."
   (alien-search/ad-disable 'read-from-minibuffer 'before 'alien-search/read-from-minibuf/with-initial-contents)
   (alien-search/ad-activate 'read-from-minibuffer)
   
@@ -2560,9 +2560,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-query-replace) => VOID
+;;  (alien-search/re-builder/query-replace-on-target-buffer) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-query-replace ()
+(defun alien-search/re-builder/query-replace-on-target-buffer ()
   "Run `alien-search/query-replace' with current RE."
   (interactive)
   (alien-search/replace/assert-available)
@@ -2584,9 +2584,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
       (alien-search/ad-activate 'read-from-minibuffer))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-occur) => VOID
+;;  (alien-search/re-builder/occur-on-target-buffer) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-occur ()
+(defun alien-search/re-builder/occur-on-target-buffer ()
   "Run `alien-search/occur' with current RE."
   (interactive)
   (alien-search/occur/assert-available)
@@ -2605,9 +2605,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
       (alien-search/ad-activate 'read-from-minibuffer))))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-isearch-forward) => VOID
+;;  (alien-search/re-builder/isearch-forward-on-target-buffer) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-isearch-forward ()
+(defun alien-search/re-builder/isearch-forward-on-target-buffer ()
   "Run `alien-search/isearch-forward' with current RE."
   (interactive)
   (alien-search/isearch/assert-available)
@@ -2623,9 +2623,9 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (alien-search/isearch-forward)))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-isearch-backward) => VOID
+;;  (alien-search/re-builder/isearch-backward-on-target-buffer) => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-isearch-backward ()
+(defun alien-search/re-builder/isearch-backward-on-target-buffer ()
   "Run `alien-search/isearch-backward' with current RE."
   (interactive)
   (alien-search/isearch/assert-available)
@@ -2641,9 +2641,10 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (alien-search/isearch-backward)))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-non-incremental-search-forward) => VOID
+;;  (alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
+;;                                                                     => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-non-incremental-search-forward ()
+(defun alien-search/re-builder/non-incremental-search-forward-on-target-buffer ()
   "Run `alien-search/non-incremental/search-forward' with current RE."
   (interactive)
   (alien-search/non-incremental/assert-available)
@@ -2652,9 +2653,10 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
     (alien-search/non-incremental/search-forward regexp)))
 
 ;; ----------------------------------------------------------------------------
-;;  (alien-search/re-builder/run-non-incremental-search-backward) => VOID
+;;  (alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
+;;                                                                     => VOID
 ;; ----------------------------------------------------------------------------
-(defun alien-search/re-builder/run-non-incremental-search-backward ()
+(defun alien-search/re-builder/non-incremental-search-backward-on-target-buffer ()
   "Run `alien-search/non-incremental/search-backward' with current RE."
   (interactive)
   (alien-search/non-incremental/assert-available)
