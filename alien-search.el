@@ -1,4 +1,4 @@
-;; alien-search.el --- search and replace with alien regular expression.
+;; alien-search.el --- search and replace by regexp which is alien to Emacs.
 
 ;; Copyright (C) 2010 K-talo Miyazaki, all rights reserved.
 
@@ -31,143 +31,315 @@
 
 ;;; Commentary:
 ;;
+;; CAUTION
+;; =======
+;; THIS LIBRARY IS VERY EXPERIMENTAL!!!
+;;
+;;
 ;; Overview
 ;; ========
-;;
-;;     *** CAUTION: THIS LIBRARY IS VERY EXPERIMENTAL!!! ***
-;;
 ;; This library is an extension of `shell-command'.
 ;;
 ;; What this library does are:
 ;;
-;;   1. Search for a pattern from text in current buffer with external
-;;      program(*) in manner of their regular expression.
+;;   1. Search for a regexp(*1) from text in current buffer by
+;;      external command(*2).
 ;;      
-;;         (*) Ruby (v1.9 or later is required) scripts are
-;;             predefined in this file.
+;;         (*1) You can write regexp with syntax of external
+;;              command.
 ;;
-;;   2. Browse result of the search operation produced by external program
-;;      (...and apply result of the replacement operations if required)
-;;      through Emacs user interface like `occur', `isearch' and
-;;      `query-replace'.
+;;         (*2) External commands written in Perl (v5.8 or later
+;;              is required) and Ruby (v1.9 or later is required)
+;;              are pre-defined in this file.
+;;              To use regexp syntax of your choice, you can
+;;              write your own external command.
+;;
+;;   2. Let us browse search results from an external command via
+;;      Emacs user interface like `occur' and `isearch'.
+;;
+;;      Also let us apply results of the replacement operation by an
+;;      external command via `query-replace' interface.
+;;
+;;
+;; REQUIREMENTS
+;; ============
+;; By shell scripts defined in this file as default external commands,
+;; perl (>= 5.8) or ruby (>= 1.9) is required.
+;;
+;; Also features `cl', `menu-bar' and `re-builder' are required.
+;;
+;; For better multilingual support, Emacs (>= 21) may be required.
 ;;
 ;;
 ;; INSTALLING
 ;; ==========
 ;; To install this library, save this file to a directory in your
 ;; `load-path' (you can view the current `load-path' using "C-h v
-;; load-path RET" within Emacs), then add the following line to your
-;; .emacs startup file:
+;; load-path <RET>" within Emacs), then add the following lines to
+;; your .emacs start up file:
 ;;
 ;;    (require 'alien-search)
 ;;
-;;
-;; USING
-;; =====
-;;
-;;  M-x alien-search/occur RET PATTERN RET
-;;
-;;    `occur' with regular expression in manner of external program.
+;;    (custom-set-variables
+;;     '(alien-search/alien-type 'perl) ;; Choose by your preference.
+;;     '(reb-re-syntax 'alien)) ;; Tell re-builder to use alien regexp.
 ;;
 ;;
-;;  M-x alien-search/query-replace RET PATTERN RET REPLACEMENT RET
+;; USAGE EXAMPLE
+;; =============
 ;;
-;;    `query-replace' with regular expression in manner of external
-;;    program.
+;; [Example-1] Query Replace in manner of Perl.
+;;
+;;   STEP-1: Set alien-type to Perl.
+;;
+;;        `M-x alien-search/alien-type/set <RET> perl <RET>'
+;;
+;;        NOTE: Once you choose ALIEN-TYPE, Emacs will remember it
+;;              until exit. You can also set and save ALIEN-TYPE for
+;;              next Emacs session by setting value via customize.
+;;              See "COMMANDS(1)" section in this document.
+;;
+;;   STEP-2: Run query replace 
+;;
+;;        `M-s M-% (\d+)---(\d+) <RET> ${1}456${2} <RET>'
+;;
+;;        This command replaces text in buffer:
+;;
+;;           123---789
+;;
+;;        with text:
+;;
+;;           123456789
+;;
+;;        Variables in replacement string are interpolated by Perl.
 ;;
 ;;
-;;  M-x alien-search/isearch-forward RET PATTERN
-;;  M-x alien-search/isearch-backward RET PATTERN
+;; [Example-2] Query Replace in manner of Ruby.
 ;;
-;;    `isearch' with regular expression in manner of external program.
+;;   STEP-1: Set alien-type to Ruby.
+;;
+;;        `M-x alien-search/alien-type/set <RET> ruby <RET>'
+;;
+;;   STEP-2: Run query replace 
+;;
+;;        `M-s M-% (\d+)---(\d+) <RET> #{$1}456#{$2} <RET>'
+;;
+;;        This command replaces text in buffer:
+;;
+;;           123---789
+;;
+;;        with text:
+;;
+;;           123456789
+;;
+;;        Variables in replacement string are interpolated by ruby
+;;        as if it ware in the string inside of a block of "gsub"
+;;        method.
 ;;
 ;;
-;;  M-x alien-search/isearch-forward RET RET PATTERN RET
-;;  M-x alien-search/isearch-backward RET RET PATTERN RET
+;; COMMANDS(1): SETTING ALIEN-TYPE
+;; ===============================
 ;;
-;;    Non-incremental search with regular expression in manner of
-;;    external program.
+;;  `M-x alien-search/alien-type/set <RET> ALIEN-TYPE <RET>'
 ;;
+;;      Set type of regexp syntax to ALIEN-TYPE.
+;;      By default, two alien-types `perl' and `ruby' are provided.
 ;;
-;;  Note that notation of PATTERN and REPLACEMENT are different
-;;  for each external program.
+;;      You can also set ALIEN-TYPE via customization interface:
 ;;
-;;
-;;  If you want to escape meta characters in lisp string,
-;;  use function `alien-search/quote-meta'.
+;;      `M-x customize-apropos <RET> alien-search/alien-type <RET>'.
 ;;
 ;;
-;; USING WITH DEFAULT EXTERNAL PROGRAMS
-;; ====================================
-;; Default external programs, that are defined this file, brings
-;; manner of Ruby to search/replace operations.
+;; COMMANDS(2): SEARCH AND REPLACEMENT
+;; ===================================
 ;;
-;; These programs accepts regular expression of Ruby as PATTERN,
-;; and interpolates special variables $&, $`, $', $+ and $1..$9
-;; in REPLACEMENT as if it has been inside of double quotes
-;; in a block of String#gsub method.
+;; NOTE: While editing a regular expression on the minibuffer prompt
+;;       of `alien-search' commands below, you can switch to another
+;;       `alien-search' command without losing current editing state.
 ;;
-;;   Example:
+;; `M-s M-o REGEXP <RET>'
+;; `M-x alien-search/occur <RET> REGEXP <RET>'
 ;;
-;;     The command
+;;      Show all lines in the current buffer containing a match
+;;      for alien REGEXP.
 ;;
-;;       M-x alien-search/query-replace RET (\d+)-(\d+) RET #$1...#$2 RET
+;; `M-s M-% REGEXP <RET> REPLACEMENT <RET>'
+;; `M-x alien-search/query-replace <RET> REGEXP <RET> REPLACEMENT <RET>'
 ;;
-;;     replaces text in buffer
+;;      Replace some matches for alien REGEXP with REPLACEMENT.
+;;      Note that notation of REPLACEMENT is different for
+;;      each ALIEN-TYPE.
 ;;
-;;       123-456
+;; `M-s M-s'
+;; `M-x alien-search/isearch-forward <RET>'
 ;;
-;;     with text
+;;      Begin incremental search for an alien regexp.
 ;;
-;;       123...456
-;;   
-;; 
-;; Key map Examples
-;; ================
-;; (when (require 'alien-search nil t)
-;;   (define-key esc-map [(f4)]  'alien-search/occur)
-;;   ;; Override `query-replace'.
-;;   (define-key esc-map [?\C-%] 'alien-search/query-replace)
-;;   ;; Override `isearch-forward-regexp'.
-;;   (define-key esc-map [?\C-s] 'alien-search/isearch-forward)
-;;   ;; Override `isearch-backward-regexp'.
-;;   (define-key esc-map [?\C-r] 'alien-search/isearch-backward))
+;; `M-s M-r'
+;; `M-x alien-search/isearch-backward <RET> REGEXP;
+;;
+;;      Begin reverse incremental search for an alien regexp.
+;;
+;; `M-s M-f REGEXP <RET>'
+;; `M-x alien-search/non-incremental/search-forward <RET> REGEXP <RET>'
+;;
+;;      Search for an alien REGEXP.
+;;
+;; `M-s M-F REGEXP <RET>'
+;; `M-x alien-search/non-incremental/search-backward <RET> REGEXP <RET>'
+;;
+;;      Search for an alien REGEXP backward.
+;;
+;; `M-s M-g'
+;; `M-x nonincremental-repeat-search-forward'
+;;
+;;      Search forward for the previous search string or regexp.
+;;
+;; `M-s M-G'
+;; `M-x nonincremental-repeat-search-backward'
+;;
+;;      Search backward for the previous search string or regexp.
+;;
+;;
+;; COMMANDS(3): WORKING WITH SEARCH OPTIONS
+;; ========================================
+;; NOTE: The status of each search option will be displayed by an
+;;       indicator which is put on the minibuffer prompt of each
+;;       `alien-search' command, or put on the mode-line of a
+;;       buffer `*RE-Builder*'. The indicator will be displayed
+;;       like these: "[isx]" for perl, "[imx]" for ruby.
+;;       
+;; `M-s M-i'
+;; `M-x alien-search/toggle-case-fold <RET>'
+;;
+;;      Toggle search option `case-fold-search'.
+;;
+;; `M-s M-m'
+;; `M-x alien-search/toggle-dot-match <RET>'
+;;
+;;      Toggle search option `alien-search/dot-match-a-newline-p'.
+;;
+;; `M-s M-x'
+;; `M-x alien-search/toggle-ext-regexp <RET>'
+;;
+;;      Toggle search option `alien-search/use-extended-regexp-p'.
+;;
+;;
+;; COMMANDS(4): CONSTRUCTING REGEXP
+;; ================================
+;;
+;; `M-x reb-change-syntax <RET> alien <RET>'
+;;
+;;      Set the syntax used by the `re-builder' to alien regexp.
+;;
+;; `M-s M-l'
+;; `M-x re-builder <RET>'
+;;
+;;      Start an interactive construction of a regexp with
+;;      `re-builder'.
+;;      (See also documents of `re-builder')
+;;
+;;      NOTE-1: To apply the regexp, which was constructed with
+;;              `re-builder', to the `alien-search' commands,
+;;              call commands below in `*RE-Builder*' buffer:
+;;
+;;             `M-s M-o'
+;;             `M-x alien-search/re-builder/occur-on-target-buffer'
+;;
+;;                  Run `alien-search/occur' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;             `M-s M-%'
+;;             `M-x alien-search/re-builder/query-replace-on-target-buffer'
+;;
+;;                  Run `alien-search/query-replace' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;             `M-s M-s'
+;;             `M-x alien-search/re-builder/isearch-forward-on-target-buffer'
+;;
+;;                  Run `alien-search/isearch-forward' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;             `M-s M-r'
+;;             `M-x alien-search/re-builder/isearch-backward-on-target-buffer'
+;;
+;;                  Run `alien-search/isearch-backward' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;             `M-s M-f'
+;;             `M-x alien-search/re-builder/non-incremental-search-forward-on-target-buffer'
+;;
+;;                  Run `alien-search/non-incremental/search-forward' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;             `M-s M-F'
+;;             `M-x alien-search/re-builder/non-incremental-search-backward-on-target-buffer'
+;;
+;;                  Run `alien-search/non-incremental/search-backward' in `reb-target-buffer'
+;;                  with an alien regexp in the buffer `*RE-Builder*'.
+;;
+;;
+;;      NOTE-2: You can switch search options of the
+;;              `reb-target-buffer' with commands below:
+;;
+;;              `M-s M-i'
+;;              `M-x alien-search/re-builder/toggle-case-fold-on-target-buffer'
+;;
+;;                  Toggle search option `case-fold-search' of `reb-target-buffer'.
+;;
+;;              `M-s M-m'
+;;              `M-x alien-search/re-builder/toggle-dot-match-on-target-buffer'
+;;
+;;                  Toggle search option `alien-search/dot-match-a-newline-p'
+;;                  of `reb-target-buffer'.
+;;
+;;              `M-s M-x'
+;;              `M-x alien-search/re-builder/toggle-ext-regexp-on-target-buffer'
+;;
+;;                  Toggle search option `alien-search/dot-match-a-newline-p'
+;;                  of `alien-search/use-extended-regexp-p'.
+;;
+;; `M-\'
+;; `M-x alien-search/quote-meta-in-region <RET>'
+;;
+;;      Escape characters in region, that would have special meaning
+;;      in alien regexp.
 ;;
 ;;
 ;; FOR HACKERS
 ;; ===========
-;; This library requires four external programs to execute
-;; `alien-search/occur', `alien-search/query-replace',
-;; `alien-search/isearch-*' and `alien-search/quote-meta'
-;; with regular expressions that are alien to emacs.
-;;
-;; If you want to write these external programs by your choice
-;; of language, see help documents of these variables:
+;; You can use regexp syntax of your choice of language, if you
+;; write four external commands below with the language:
 ;; 
 ;;   `alien-search/replace/external-command'
 ;;   `alien-search/occur/external-command'
-;;   `alien-search/isearch/external-command'
+;;   `alien-search/search/external-command'
 ;;   `alien-search/quote-meta/external-command'
 ;;
-;; and set path to the programs to the variables when you wrote
-;; them.
+;; and install these commands with the function
+;; `alien-search/alien-type/define'.
 ;;
-;; See also default external programs written in Ruby, defined as:
+;; See help documents of these variables and function
+;; for more information.
 ;;
-;;   `alien-search/replace/shell-script'
-;;   `alien-search/occur/shell-script'
-;;   `alien-search/isearch/shell-script'
-;;   `alien-search/quote-meta/shell-script'
+;;
+;; KNOWN BUGS
+;; ==========
+;; - Codes aside, this document should be rewritten.
+;;   My English sucks :-(
 ;;
 ;;
 ;; WISH LIST
 ;; =========
-;; - Better handling of exceptions from external program,
-;;   especially syntax error regarding to regular expression
-;;   in isearch session.
-;; - Better response?
-;; - Write tests.
-;; - validate-regexp by external program?
+;; - `grep' with alien regexp?
+;; - `tags-search', `tags-query-replace', `dried-do-search' and
+;;   `dired-do-query-replace-regexp' with alien regexp?
+;; - `multi-isearch-buffers-regexp', `multi-occur',
+;;   `multi-occur-in-matching-buffers', `how-many', `flush-lines',
+;;   and `keep-lines' with alien regexp?
+;; - Better error messages.
+;; - Write Tests.
 
 ;;; Change Log:
 
@@ -251,10 +423,14 @@ contains texts passed from Emacs to external commands.")
 
 ;; Search options.
 ;;
-(defvar alien-search/dot-match-a-newline-p nil)
+(defvar alien-search/dot-match-a-newline-p nil
+  "Non-nil if searches and muches in alien regexp
+should match a new line character by \".\".")
 (make-variable-buffer-local 'alien-search/dot-match-a-newline-p)
 
-(defvar alien-search/use-extended-regexp-p nil)
+(defvar alien-search/use-extended-regexp-p nil
+  "Non-nil if search and much in alien regexp
+should use extended regexp.")
 (make-variable-buffer-local 'alien-search/use-extended-regexp-p)
 
 
