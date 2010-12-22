@@ -7,7 +7,7 @@
 ;; Keywords: convenience emulations matching tools unix wp
 ;; Revision: $Id$
 ;; URL: 
-;; GitHub: 
+;; GitHub: http://github.com/k-talo/alien-search.el
 
 ;; This file is not part of GNU Emacs.
 
