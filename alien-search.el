@@ -4008,4 +4008,559 @@ will be used to customize user option `alien-search/alien-type'."
  '(lambda ()
     (alien-search/alien-type/set alien-search/alien-type)))
 
+
+;;; ===========================================================================
+;;;
+;;;  Predefined Shell Scripts.
+;;;
+;;; ===========================================================================
+
+(defvar alien-search/shell-script/alien-search-occur-aux.pl "
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use 5.008;
+
+use Encode;
+use utf8;
+
+use English qw( -no_match_vars );
+use FileHandle;
+
+sub main () {
+    my $fn_in     = shift @ARGV or die \"No input  file name!\";
+    my $fn_out    = shift @ARGV or die \"No output file name!\";
+    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
+    my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
+    my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
+    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";;
+    my $code      = 'utf8';
+    my $offset    = 0;
+    
+    umask 0177;
+    
+    my($str_in, $str_pat, $str_repl);
+    use PerlIO::encoding;
+    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
+    {
+        local $INPUT_RECORD_SEPARATOR = undef;
+        $str_pat  = FileHandle->new($fn_pat, \"<:encoding($code)\")->getline;
+    }
+    
+    my $pat = eval(\"qr/\\${str_pat}/om\" .
+                   ( $dot_p  ? \"s\" : \"\") .
+                   (!$case_p ? \"i\" : \"\") .
+                   ( $ext_p  ? \"x\" : \"\"));
+    die $EVAL_ERROR if $EVAL_ERROR;
+    
+    {
+        local $INPUT_RECORD_SEPARATOR = \"\\n\";
+        my $fh_in  = FileHandle->new($fn_in, \"<:encoding($code)\");
+        my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
+        
+        print $fh_out \"(setq result '(\\n\";
+        
+        while (my $line = <$fh_in>) {
+            my $len     = length $line;
+            my $matched = 0;
+            chomp $line;
+            
+            
+            while ($line =~ m/${pat}/g) {
+                print $fh_out '(' unless $matched++;
+                print($fh_out
+                      '(',
+                      $offset + $LAST_MATCH_START[0], ' ',
+                      $offset + $LAST_MATCH_END  [0],
+                      ')');
+            }
+            
+            print $fh_out ')' if $matched;
+                
+            $offset += $len;
+        }
+        
+        print $fh_out \"))\\n\";
+        print $fh_out \";;; EOF\\n\";
+    }
+    
+    exit 0;
+}
+
+main();
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-occur-aux.rb "
+#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def main ()
+  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p = ARGV
+  
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  offset = 0
+  
+  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
+                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
+                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\"
+  
+  open(fn_in, 'r:UTF-8') do |file_in|
+    while line = file_in.gets do
+      matched = 0
+      len = line.length
+      line.chomp!
+      
+      line.scan( pat ) do
+        print '(' if matched == 0
+        print '('
+        print offset + Regexp.last_match.begin(0), ' '
+        print offset + Regexp.last_match.end(0)
+        print ')'
+        matched += 1
+      end
+      print ')' if matched != 0
+      
+      offset += len
+    end
+  end
+  
+  print \"))\\n\"
+  print \";;; EOF\\n\"
+  
+  exit 0
+  
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-quote-meta-aux.pl "
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use 5.008;
+
+use Encode;
+use utf8;
+
+use English qw( -no_match_vars );
+use FileHandle;
+
+sub escape_perl_str_for_emacs {
+    my $r_txt = shift;
+    ${$r_txt} =~ s/\\\\/\\\\\\\\/og;
+    ${$r_txt} =~ s/\"/\\\\\"/og;
+}
+
+sub main () {
+    my $fn_out    = shift @ARGV or die \"No output file name!\";
+    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
+    my $code      = 'utf8';
+    
+    umask 0177;
+    
+    my($str_pat);
+    use PerlIO::encoding;
+    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
+    {
+        local $INPUT_RECORD_SEPARATOR = undef;
+        $str_pat = FileHandle->new($fn_pat, \"<:encoding($code)\")->getline;
+        $str_pat = quotemeta($str_pat);
+        escape_perl_str_for_emacs(\\$str_pat)
+    }
+    
+    {
+        my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
+        
+        print $fh_out \"(setq result \\\"${str_pat}\\\")\\n\";
+        print $fh_out \";;; EOF\\n\";
+    }
+    
+    exit 0;
+}
+
+main();
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-quote-meta-aux.rb "
+#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def escape_ruby_str_for_emacs! (str)
+  str.gsub!(/\\\\/) {'\\\\\\\\'}
+  str.gsub!(/\"/ ) {'\\\\\"'}
+end
+
+def main ()
+  fn_out, fn_pat = ARGV
+  
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  retval = Regexp.escape(str_pat)
+  escape_ruby_str_for_emacs!(retval)
+  
+  print '(setq result \"'
+  print retval
+  print '\")'
+
+  exit 0
+end
+
+main
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-replace-aux.pl "
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use 5.008;
+
+use Encode;
+use utf8;
+
+package main;
+use English qw( -no_match_vars );
+use FileHandle;
+
+sub generate_build_replacement_fn {
+    # Eval replacement string in environment
+    # which has no lexical variable.
+    #
+    # Special-variables in the replacement string
+    # will be interpolated.
+    eval 'sub {\"'.$_[0].'\"}';
+}
+
+sub eval_replacement {
+    eval $_[0]
+}
+
+sub interpolate_replacement {
+    eval '\"'.$_[0].'\"'
+}
+
+sub eval_and_interpolate_replacement {
+    # Not tested yet.
+    my $str_repl = shift;
+    $str_repl = eval_replacement($str_repl);
+    die \"Error while evaluating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+    $str_repl = interpolate_replacement($str_repl);
+    die \"Error while interpolating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+    $str_repl
+}
+
+sub escape_str_to_eval {
+    my $r_txt = shift;
+    ${$r_txt} =~ s/\\\\/\\\\\\\\/og;
+    ${$r_txt} =~ s/\"/\\\\\"/og;
+}
+
+sub escape_perl_str_for_emacs {
+    my $r_txt = shift;
+    ${$r_txt} =~ s/\\\\/\\\\\\\\/og;
+    ${$r_txt} =~ s/\"/\\\\\"/og;
+}
+
+sub main () {
+    my $fn_in     = shift @ARGV or die \"No input  file name!\";
+    my $fn_out    = shift @ARGV or die \"No output file name!\";
+    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
+    my $fn_repl   = shift @ARGV or die \"No replacement file name!\";
+    my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
+    my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
+    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";;
+    my $code      = 'utf8';
+    
+    my($str_in, $str_pat, $str_repl);
+    use PerlIO::encoding;
+    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
+    {
+        local $INPUT_RECORD_SEPARATOR = undef;
+        $str_in   = FileHandle->new($fn_in,   \"<:encoding($code)\")->getline;
+        $str_pat  = FileHandle->new($fn_pat,  \"<:encoding($code)\")->getline;
+        $str_repl = FileHandle->new($fn_repl, \"<:encoding($code)\")->getline;
+    }
+    my $pat = eval(\"qr/\\${str_pat}/om\" .
+                   ( $dot_p  ? \"s\" : \"\") .
+                   (!$case_p ? \"i\" : \"\") .
+                   ( $ext_p  ? \"x\" : \"\"));
+    die $EVAL_ERROR if $EVAL_ERROR;
+    
+    escape_str_to_eval(\\$str_repl);
+    my $build_replacement_fn = generate_build_replacement_fn($str_repl);
+    die \"Error in replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+    
+    umask 0177;
+    my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
+    
+    print $fh_out \"(setq result '(\", \"\\n\";
+    
+    while ($str_in =~ m/${str_pat}/omg) {
+        my $replacement = eval { $build_replacement_fn->() };
+        die \"Error while interpolating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+            
+        escape_perl_str_for_emacs(\\$replacement);
+            
+        print $fh_out \" (\";
+        print $fh_out $LAST_MATCH_START[0], ' ';
+        print $fh_out $LAST_MATCH_END  [0], ' ';
+        print $fh_out '\"', $replacement, '\"';
+        print $fh_out \" )\", \"\\n\";
+    }
+    
+    print $fh_out \"))\", \"\\n\";
+    print $fh_out \";;; EOF\", \"\\n\";
+
+    exit 0;
+}
+
+main();
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-replace-aux.rb "
+#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def escape_str_for_eval! (str)
+  str.gsub!(/\"/ ){'\\\\\"'}
+end
+
+def escape_ruby_str_for_emacs! (str)
+  str.gsub!(/\\\\/) {'\\\\\\\\'}
+  str.gsub!(/\"/ ) {'\\\\\"'}
+end
+
+def main ()
+  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p = ARGV
+  
+  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  str_rpl = open(fn_rpl, 'r:UTF-8') {|f| f.read}
+  
+  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
+                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
+                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
+  
+  escape_str_for_eval!(str_rpl)
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\"
+  
+  str_in.scan( pat ) do |m|
+    replacement = eval '\"' + str_rpl + '\"'
+    escape_ruby_str_for_emacs!(replacement)
+    
+    print '('
+    print Regexp.last_match.begin(0), ' '
+    print Regexp.last_match.end(0),   ' '
+    print '\"', replacement, '\"'
+    print ')'
+  end
+  
+  print \"))\\n\"
+  print \";;; EOF\\n\"
+  
+  exit 0
+  
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-search-aux.pl "
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use 5.008;
+
+use Encode;
+use utf8;
+
+use English qw( -no_match_vars );
+use FileHandle;
+
+sub main () {
+    my $fn_in     = shift @ARGV or die \"No input  file name!\";
+    my $fn_out    = shift @ARGV or die \"No output file name!\";
+    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
+    my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
+    my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
+    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";
+    my $limit     = @ARGV ? shift(@ARGV) : die \"No search limit.\";
+    my $code      = 'utf8';
+    
+    umask 0177;
+    
+    my($str_in, $str_pat, $str_repl);
+    use PerlIO::encoding;
+    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
+    {
+        local $INPUT_RECORD_SEPARATOR = undef;
+        $str_in   = FileHandle->new($fn_in,  \"<:encoding($code)\")->getline;
+        $str_pat  = FileHandle->new($fn_pat, \"<:encoding($code)\")->getline;
+    }
+    
+    my $pat = eval(\"qr/\\${str_pat}/om\" .
+                   ( $dot_p  ? \"s\" : \"\") .
+                   (!$case_p ? \"i\" : \"\") .
+                   ( $ext_p  ? \"x\" : \"\"));
+    die $EVAL_ERROR if $EVAL_ERROR;
+    
+    {
+        my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
+        
+        print $fh_out \"(setq result '(\";
+        
+        my $i = 0;
+        while (((!$limit) || (++$i <= $limit)) && ($str_in =~ m/${pat}/omg)) {
+            print $fh_out ' (';
+
+            foreach my $i (0 .. $#LAST_MATCH_START) {
+                print $fh_out $LAST_MATCH_START[$i], ' ';
+                print $fh_out $LAST_MATCH_END  [$i], ' ';
+            }
+            print $fh_out ')',;
+        }
+        
+        print $fh_out \"))\\n\";
+        print $fh_out \";;; EOF\\n\";
+    }
+    
+    exit 0;
+}
+
+main();
+
+# EOF
+
+")
+
+(defvar alien-search/shell-script/alien-search-search-aux.rb "
+#!/usr/bin/env ruby
+# -*- coding: utf-8-unix -*-
+
+abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
+
+def main ()
+  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p, limit = ARGV
+  
+  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
+  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
+  
+  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
+                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
+                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
+  
+  $stdout = open(fn_out, 'w:UTF-8')
+  
+  print \"(setq result '(\"
+  
+  limit = (Integer limit rescue nil)
+  count = 0
+  
+  str_in.scan( pat ) do
+    break unless (!limit || ((count += 1) <= limit))
+    
+    print '('
+    Regexp.last_match.length.times {|i|
+      print Regexp.last_match.begin(i), ' '
+      print Regexp.last_match.end(i),   ' '
+    }
+    print ')'
+  end
+  
+  print \"))\\n\"
+  print \";;; EOF\\n\"
+  
+  exit 0
+
+rescue RegexpError
+  $stderr.print $!.message
+  exit 1
+end
+
+main
+
+# EOF
+
+")
+
+
+;;; ===========================================================================
+;;;
+;;;  Define Alien Types.
+;;;
+;;; ===========================================================================
+
+(alien-search/alien-type/define
+ :name 'perl
+ :tag "Perl (v5.8 or later)"
+ :input-coding-system    'utf-8-unix
+ :output-coding-system   'utf-8-unix
+ :script-search          alien-search/shell-script/alien-search-search-aux.pl
+ :script-replace         alien-search/shell-script/alien-search-replace-aux.pl
+ :script-occur           alien-search/shell-script/alien-search-occur-aux.pl
+ :script-quote-meta      alien-search/shell-script/alien-search-quote-meta-aux.pl
+ :indicator-case-fold     "i"
+ :indicator-no-case-fold  "-"
+ :indicator-ext-regexp    "x"
+ :indicator-no-ext-regexp "-"
+ :indicator-dot-match     "s"
+ :indicator-no-dot-match  "-"
+ :indicator-separator     "")
+  
+(alien-search/alien-type/define
+ :name 'ruby
+ :tag "Ruby (v1.9 or later)"
+ :input-coding-system    'utf-8-unix
+ :output-coding-system   'utf-8-unix
+ :script-search          alien-search/shell-script/alien-search-search-aux.rb
+ :script-replace         alien-search/shell-script/alien-search-replace-aux.rb
+ :script-occur           alien-search/shell-script/alien-search-occur-aux.rb
+ :script-quote-meta      alien-search/shell-script/alien-search-quote-meta-aux.rb
+ :indicator-case-fold     "i"
+ :indicator-no-case-fold  "-"
+ :indicator-ext-regexp    "x"
+ :indicator-no-ext-regexp "-"
+ :indicator-dot-match     "m"
+ :indicator-no-dot-match  "-"
+ :indicator-separator     "")
+
 ;;; alien-search.el ends here
