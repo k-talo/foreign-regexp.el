@@ -353,6 +353,10 @@
   (require 'cl)
   (require 're-builder))
 
+(require 'cl)
+(require 'menu-bar)
+(require 're-builder)
+
 
 ;;; ===========================================================================
 ;;;
