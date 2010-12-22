@@ -3457,7 +3457,15 @@ transition to another alien-search command."
                       
                       (lexical-let ((regexp isearch-string))
                         (unwind-protect
-                            (isearch-exit)
+                            (progn
+                              ;; When `isearch-string' is empty,
+                              ;; `isearch-exit' calls `isearch-edit-string'
+                              ;; and isearch won't be quit. So we set
+                              ;; dummy string to `isearch-string' if
+                              ;; it is empty.
+                              (when (= 0 (length isearch-string))
+                                (setq isearch-string " "))
+                              (isearch-exit))
                           ;; `isearch-exit' throws something in some case,
                           ;; so another alien-search command should be called
                           ;; from within protected form.
