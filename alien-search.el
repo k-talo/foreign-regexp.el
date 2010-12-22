@@ -4016,8 +4016,7 @@ will be used to customize user option `alien-search/alien-type'."
 ;;;
 ;;; ===========================================================================
 
-(defvar alien-search/shell-script/alien-search-occur-aux.pl "
-#!/usr/bin/env perl
+(defvar alien-search/shell-script/alien-search-occur-aux.pl "#!/usr/bin/env perl
 use strict;
 use warnings;
 use 5.008;
@@ -4094,8 +4093,7 @@ main();
 
 ")
 
-(defvar alien-search/shell-script/alien-search-occur-aux.rb "
-#!/usr/bin/env ruby
+(defvar alien-search/shell-script/alien-search-occur-aux.rb "#!/usr/bin/env ruby
 # -*- coding: utf-8-unix -*-
 
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
@@ -4150,8 +4148,7 @@ main
 
 ")
 
-(defvar alien-search/shell-script/alien-search-quote-meta-aux.pl "
-#!/usr/bin/env perl
+(defvar alien-search/shell-script/alien-search-quote-meta-aux.pl "#!/usr/bin/env perl
 use strict;
 use warnings;
 use 5.008;
@@ -4201,8 +4198,7 @@ main();
 
 ")
 
-(defvar alien-search/shell-script/alien-search-quote-meta-aux.rb "
-#!/usr/bin/env ruby
+(defvar alien-search/shell-script/alien-search-quote-meta-aux.rb "#!/usr/bin/env ruby
 # -*- coding: utf-8-unix -*-
 
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
@@ -4235,8 +4231,7 @@ main
 
 ")
 
-(defvar alien-search/shell-script/alien-search-replace-aux.pl "
-#!/usr/bin/env perl
+(defvar alien-search/shell-script/alien-search-replace-aux.pl "#!/usr/bin/env perl
 use strict;
 use warnings;
 use 5.008;
@@ -4346,8 +4341,7 @@ main();
 
 ")
 
-(defvar alien-search/shell-script/alien-search-replace-aux.rb "
-#!/usr/bin/env ruby
+(defvar alien-search/shell-script/alien-search-replace-aux.rb "#!/usr/bin/env ruby
 # -*- coding: utf-8-unix -*-
 
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
@@ -4405,8 +4399,7 @@ main
 
 ")
 
-(defvar alien-search/shell-script/alien-search-search-aux.pl "
-#!/usr/bin/env perl
+(defvar alien-search/shell-script/alien-search-search-aux.pl "#!/usr/bin/env perl
 use strict;
 use warnings;
 use 5.008;
@@ -4473,8 +4466,7 @@ main();
 
 ")
 
-(defvar alien-search/shell-script/alien-search-search-aux.rb "
-#!/usr/bin/env ruby
+(defvar alien-search/shell-script/alien-search-search-aux.rb "#!/usr/bin/env ruby
 # -*- coding: utf-8-unix -*-
 
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
