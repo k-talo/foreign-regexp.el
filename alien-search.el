@@ -1165,52 +1165,51 @@ and `alien-search/re-builder/occur-on-target-buffer'."
       "Keymap for search related commands.")
     (define-key esc-map "s" search-map))
   
+  (defvar reb-mode-search-map  (make-sparse-keymap)
+    "Keymap for search related commands.")
+  
   ;; keys for `alien-search' commands.
   ;;
   (when (boundp 'search-map) ;; For compiler
-    (define-key search-map       "\M-o"     'alien-search/occur)
-    (define-key search-map       "\M-%"     'alien-search/query-replace)
-    (define-key search-map       "\M-s"     'alien-search/isearch-forward)
-    (define-key search-map       "\M-r"     'alien-search/isearch-backward)
-    (define-key search-map       "\M-f"     'alien-search/non-incremental/search-forward)
-    (define-key search-map       "\M-F"     'alien-search/non-incremental/search-backward)
-    (define-key search-map       "\M-g"     'nonincremental-repeat-search-forward)
-    (define-key search-map       "\M-G"     'nonincremental-repeat-search-backward)
-    (define-key search-map       "\M-l"     're-builder)
-    (define-key search-map       "\M-\\"    'alien-search/quote-meta-in-region)
+    
+    ;; Prefix keys.
+    ;;
+    (define-key isearch-mode-map    "\M-s"  search-map)
+    (define-key reb-mode-map        "\M-s"  reb-mode-search-map)
   
-    (define-key reb-mode-map     "\M-s\M-o" 'alien-search/re-builder/occur-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-%" 'alien-search/re-builder/query-replace-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-s" 'alien-search/re-builder/isearch-forward-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-r" 'alien-search/re-builder/isearch-backward-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-f" 'alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-F" 'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-g" 'alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-l" 'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
+    ;; Keys for `alien-search' commands.
+    ;;
+    (define-key search-map          "\M-o"  'alien-search/occur)
+    (define-key search-map          "\M-%"  'alien-search/query-replace)
+    (define-key search-map          "\M-s"  'alien-search/isearch-forward)
+    (define-key search-map          "\M-r"  'alien-search/isearch-backward)
+    (define-key search-map          "\M-f"  'alien-search/non-incremental/search-forward)
+    (define-key search-map          "\M-F"  'alien-search/non-incremental/search-backward)
+    (define-key search-map          "\M-g"  'nonincremental-repeat-search-forward)
+    (define-key search-map          "\M-G"  'nonincremental-repeat-search-backward)
+    (define-key search-map          "\M-l"  're-builder)
+    (define-key search-map          "\M-\\" 'alien-search/quote-meta-in-region)
   
-    (define-key isearch-mode-map "\M-s\M-o" 'alien-search/occur)
-    (define-key isearch-mode-map "\M-s\M-%" 'alien-search/query-replace)
-    (define-key isearch-mode-map "\M-s\M-s" 'isearch-repeat-forward)
-    (define-key isearch-mode-map "\M-s\M-r" 'isearch-repeat-backward)
-    (define-key isearch-mode-map "\M-s\M-f" 'alien-search/non-incremental/search-forward)
-    (define-key isearch-mode-map "\M-s\M-F" 'alien-search/non-incremental/search-backward)
-    (define-key isearch-mode-map "\M-s\M-g" 'alien-search/non-incremental/search-forward)
-    (define-key isearch-mode-map "\M-s\M-G" 'alien-search/non-incremental/search-backward)
-    (define-key isearch-mode-map "\M-s\M-l" 're-builder)
+    (define-key reb-mode-search-map "\M-o"  'alien-search/re-builder/occur-on-target-buffer)
+    (define-key reb-mode-search-map "\M-%"  'alien-search/re-builder/query-replace-on-target-buffer)
+    (define-key reb-mode-search-map "\M-s"  'alien-search/re-builder/isearch-forward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-r"  'alien-search/re-builder/isearch-backward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-f"  'alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-F"  'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-g"  'alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-G"  'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-l"  're-builder)
+    (define-key reb-mode-search-map "\M-\\" 'alien-search/quote-meta-in-region)
   
     ;; Keys for changing `alien-search' options.
     ;;
-    (define-key search-map       "\M-i"     'alien-search/toggle-case-fold)
-    (define-key search-map       "\M-m"     'alien-search/toggle-dot-match)
-    (define-key search-map       "\M-x"     'alien-search/toggle-ext-regexp)
+    (define-key search-map          "\M-i" 'alien-search/toggle-case-fold)
+    (define-key search-map          "\M-m" 'alien-search/toggle-dot-match)
+    (define-key search-map          "\M-x" 'alien-search/toggle-ext-regexp)
   
-    (define-key reb-mode-map     "\M-s\M-i" 'alien-search/re-builder/toggle-case-fold-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-m" 'alien-search/re-builder/toggle-dot-match-on-target-buffer)
-    (define-key reb-mode-map     "\M-s\M-x" 'alien-search/re-builder/toggle-ext-regexp-on-target-buffer)
-  
-    (define-key isearch-mode-map "\M-s\M-i" 'alien-search/toggle-case-fold)
-    (define-key isearch-mode-map "\M-s\M-m" 'alien-search/toggle-dot-match)
-    (define-key isearch-mode-map "\M-s\M-x" 'alien-search/toggle-ext-regexp)
+    (define-key reb-mode-search-map "\M-i" 'alien-search/re-builder/toggle-case-fold-on-target-buffer)
+    (define-key reb-mode-search-map "\M-m" 'alien-search/re-builder/toggle-dot-match-on-target-buffer)
+    (define-key reb-mode-search-map "\M-x" 'alien-search/re-builder/toggle-ext-regexp-on-target-buffer)
   
     ;; XXX: This overrides a key for `next-matching-history-element'
     ;;      in `minibuffer-local-map', so please rebind it to a
