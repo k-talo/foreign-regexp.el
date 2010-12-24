@@ -2849,8 +2849,8 @@ for isearch to use."
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
-(defvar alien-search/align/default-wsp-pattern "([ \\t]+)"
-  "Default pattern corresponding to white spaces.")
+(defvar alien-search/align/default-wsp-regexp "([ \\t]+)"
+  "Default regexp corresponding to white spaces.")
 (defun alien-search/align (beg end regexp &optional group spacing repeat)
   (interactive
    (append
@@ -2858,7 +2858,7 @@ for isearch to use."
     (if current-prefix-arg
         (list (alien-search/read-from-minibuf/with-search-option-indicator
                (read-from-minibuffer "Complex align using alien regexp: "
-                                     alien-search/align/default-wsp-pattern
+                                     alien-search/align/default-wsp-regexp
                                      nil nil 'alien-search/history))
               (string-to-number
                (read-string
@@ -2867,10 +2867,10 @@ for isearch to use."
                (read-string "Amount of spacing (or column if negative): "
                             (number-to-string align-default-spacing)))
               (y-or-n-p "Repeat throughout line? "))
-      (list (concat alien-search/align/default-wsp-pattern
+      (list (concat alien-search/align/default-wsp-regexp
                     (alien-search/read-from-minibuf/with-search-option-indicator
                      (read-from-minibuffer "Align alien regexp: "
-                                           alien-search/align/default-wsp-pattern
+                                           alien-search/align/default-wsp-regexp
                                            nil nil 'alien-search/history)))
             1 align-default-spacing nil))))
   (let ((rule
