@@ -324,8 +324,8 @@
 ;; for more information.
 ;;
 ;;
-;; KNOWN BUGS
-;; ==========
+;; KNOWN PROBLEMS
+;; ==============
 ;; - Codes aside, this document should be rewritten.
 ;;   My English sucks :-(
 ;;
