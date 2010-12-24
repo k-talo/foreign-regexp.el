@@ -2224,8 +2224,8 @@ When LIMIT is NIL, match won't be limited.
         (g-regexp-lst      (gensym))
         (g-limit           (gensym))
         (g-args            (gensym)))
-    `(let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
-           (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
+    `(lexical-let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
+                   (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
        (unwind-protect
            (lexical-let ((,g-regexp-lst ,(nth 0 args))
                          (,g-limit      ,(nth 1 args)))
