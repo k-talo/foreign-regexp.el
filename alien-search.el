@@ -2843,8 +2843,8 @@ for isearch to use."
 ;;; ===========================================================================
 (require 'align)
 
-(defvar alien-search/align/default-wsp-regexp "([ \\t]*)"
-  "Default regexp corresponding to white spaces.")
+(defvar alien-search/align/wsp-regexp "([ \\t]+)"
+  "A regexp corresponding to white spaces.")
 
 
 ;; ----------------------------------------------------------------------------
@@ -2905,7 +2905,7 @@ See also `align-regexp'."
     (if current-prefix-arg
         (list (alien-search/read-from-minibuf/with-search-option-indicator
                (read-from-minibuffer "Complex align using alien regexp: "
-                                     alien-search/align/default-wsp-regexp
+                                     alien-search/align/wsp-regexp
                                      nil nil 'alien-search/history))
               (string-to-number
                (read-string
@@ -2914,10 +2914,10 @@ See also `align-regexp'."
                (read-string "Amount of spacing (or column if negative): "
                             (number-to-string align-default-spacing)))
               (y-or-n-p "Repeat throughout line? "))
-      (list (concat alien-search/align/default-wsp-regexp
+      (list (concat alien-search/align/wsp-regexp
                     (alien-search/read-from-minibuf/with-search-option-indicator
                      (read-from-minibuffer "Align alien regexp: "
-                                           alien-search/align/default-wsp-regexp
+                                           alien-search/align/wsp-regexp
                                            nil nil 'alien-search/history)))
             1 align-default-spacing nil))))
   (let ((rule
@@ -4169,7 +4169,8 @@ as the value of a tag."
 ;;                                       script-search
 ;;                                       script-replace
 ;;                                       script-occur
-;;                                       script-quote-meta) => VOID
+;;                                       script-quote-meta
+;;                                       wsp-regexp-for-align) => VOID
 ;; ----------------------------------------------------------------------------
 (defun* alien-search/alien-type/define (&key name
                                              tag
@@ -4186,6 +4187,7 @@ as the value of a tag."
                                              script-replace
                                              script-occur
                                              script-quote-meta
+                                             wsp-regexp-for-align
                                              cmd-path-search
                                              cmd-path-replace
                                              cmd-path-occur
@@ -4252,7 +4254,10 @@ Arguments are:
         See `alien-search/occur/shell-script'.
       
   SCRIPT-QUOTE-META:
-        See `alien-search/quote-meta/shell-script'."
+        See `alien-search/quote-meta/shell-script'.
+
+  WSP-REGEXP-FOR-ALIGN:
+        See `alien-search/align/wsp-regexp'."
   ;; Validation
   ;;
   (or name                    (error "[alien-search] No `:name'!"))
@@ -4266,6 +4271,7 @@ Arguments are:
   (or indicator-dot-match     (error "[alien-search] No `:indicator-dot-match'!"))
   (or indicator-no-dot-match  (error "[alien-search] No `:indicator-no-dot-match'!"))
   (or indicator-separator     (error "[alien-search] No `:indicator-separator'!"))
+  (or wsp-regexp-for-align    (error "[alien-search] No `:wsp-regexp-for-align'!"))
 
   (or script-search
       cmd-path-search
@@ -4300,7 +4306,8 @@ Arguments are:
               :cmd-path-search          cmd-path-search
               :cmd-path-replace         cmd-path-replace
               :cmd-path-occur           cmd-path-occur
-              :cmd-path-quote-meta      cmd-path-quote-meta)
+              :cmd-path-quote-meta      cmd-path-quote-meta
+              :wsp-regexp-for-align     wsp-regexp-for-align)
         alien-search/alien-type/.type-alst)
 
   (alien-search/alien-type/custom-widget/alien-type-selector/update))
@@ -4358,6 +4365,7 @@ Arguments are:
     (setq alien-search/occur/shell-script                        (cadr (memq :script-occur           kv-lst)))
     (setq alien-search/quote-meta/external-command               (cadr (memq :cmd-path-quote-meta    kv-lst)))
     (setq alien-search/quote-meta/shell-script                   (cadr (memq :script-quote-meta      kv-lst)))
+    (setq alien-search/align/wsp-regexp                          (cadr (memq :wsp-regexp-for-align   kv-lst)))
 
     (setq alien-search/alien-type name)
     (cond
@@ -4918,6 +4926,7 @@ main
  :script-replace         alien-search/shell-script/alien-search-replace-aux.pl
  :script-occur           alien-search/shell-script/alien-search-occur-aux.pl
  :script-quote-meta      alien-search/shell-script/alien-search-quote-meta-aux.pl
+ :wsp-regexp-for-align    "([ \\t]+)"
  :indicator-case-fold     "i"
  :indicator-no-case-fold  "-"
  :indicator-ext-regexp    "x"
@@ -4935,6 +4944,7 @@ main
  :script-replace         alien-search/shell-script/alien-search-replace-aux.rb
  :script-occur           alien-search/shell-script/alien-search-occur-aux.rb
  :script-quote-meta      alien-search/shell-script/alien-search-quote-meta-aux.rb
+ :wsp-regexp-for-align    "([ \\t]+)"
  :indicator-case-fold     "i"
  :indicator-no-case-fold  "-"
  :indicator-ext-regexp    "x"
