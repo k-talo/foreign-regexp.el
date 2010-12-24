@@ -307,6 +307,88 @@
 ;;      in alien regexp.
 ;;
 ;;
+;; COMMANDS(5): ALIGNMENT USING ALIEN REGEXP
+;; =========================================
+;;
+;; `C-M-|'
+;; `M-x align'
+;;
+;;      Align region according to pre-defined rules.
+;;
+;;      Alien regexp can be used in a rule by putting an
+;;      `alien-type' attribute on the rule.
+;;
+;;      Example)
+;;
+;;        (add-to-list
+;;         'align-rules-list
+;;         '(perl-and-ruby-hash-form
+;;
+;;           ;; This rule will be applied when `alien-type'
+;;           ;; is `perl' or `ruby'.
+;;           (alien-type . '(perl ruby))
+;;
+;;           (regexp . "([ \\t]*)=>[ \\t]*[^# \\t\\n]") ;; Alien Regexp
+;;           (group  . 1)
+;;           (repeat . t)
+;;           (modes  . '(perl-mode cperl-mode ruby-mode))))
+;;
+;;      See also `align-rules-list' and help document of an advice
+;;      of `align-region' for more information about alignment rules.
+;;
+;;
+;; `M-s M-a REGEXP <RET>'
+;; `M-x alien-search/align <RET> REGEXP <RET>'
+;;
+;;      Align the current region using a partial alien regexp
+;;      read from the minibuffer.
+;;
+;;      The alien regexp read from the minibuffer will be
+;;      supposed to be placed after whitespaces.
+;;
+;;      See also `align-regexp'.
+;;
+;; `C-u M-s M-a REGEXP <RET> NUM-GROUP <RET> NUM-SPACE <RET> THROUGHOUT <RET>'
+;; `C-u M-x alien-search/align <RET> REGEXP <RET> NUM-GROUP <RET> NUM-SPACE <RET> THROUGHOUT <RET>'
+;;
+;;      Align the current region using a full alien regexp
+;;      read from the minibuffer.
+;;
+;;      Example)
+;;
+;;        When texts in region is:
+;;
+;;             (one 1)
+;;             (ten 10)
+;;             (hundred 100)
+;;             (thousand 1000)
+;;
+;;        Run command on the region with options:
+;;
+;;             < Use regex of Perl in this example. >
+;;
+;;             REGEXP: ([ \t]+)\d
+;;                          |
+;;                          +--- NUM-GROUP: 1
+;;                               Alignment will be applied to each
+;;                               lines by inserting whitespaces to
+;;                               the place where the sub-expression
+;;                               specified by NUM-GROUP is matched to.
+;;             NUM-SPACE: 1
+;;             THOUGHOUT: y
+;;
+;;        Result is:
+;;
+;;             (one       1)
+;;             (ten       10)
+;;             (hundred   100)
+;;             (thousand 1000)
+;;                       |
+;;                       +---- Aligned using spaces NUM-SPACE unit.
+;;
+;;      See also `align-regexp'.
+;;
+;;
 ;; FOR HACKERS
 ;; ===========
 ;; You can use regexp syntax of your choice of language, if you
