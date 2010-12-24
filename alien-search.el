@@ -2995,7 +2995,7 @@ current RE on `reb-target-buffer'."
 ;;
 ;; ----------------------------------------------------------------------------
 
-(defadvice reb-next-match (around alien-search/re-builder/ext-match ())
+(defadvice reb-next-match (around alien-search/re-builder/next-match ())
   (case reb-re-syntax
     ((alien)
      (alien-search/re-builder/assert-available)
