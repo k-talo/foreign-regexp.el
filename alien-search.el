@@ -2406,7 +2406,7 @@ cache won't be cleared."
                            'alien-search/search/ongoing-search-cmd)))
         (alien-search/search/cache/clear-all))
     (error
-     (message "[alien-search] %s" c))))
+     (message "[alien-search] %s" (error-message-string c)))))
 
 (put 'isearch-repeat-forward  'alien-search/search/ongoing-search-cmd t)
 (put 'isearch-repeat-backward 'alien-search/search/ongoing-search-cmd t)
@@ -2530,8 +2530,7 @@ in BUF for REGEXP by external command."
          ;; Remove old cache.
          (alien-search/search/cache/clear buf regexp)
        (signal 'invalid-regexp
-               (list (concat "[alien-search] "
-                             (error-message-string c))))))))
+               (list (error-message-string c)))))))
 
   
 ;;; ===========================================================================
