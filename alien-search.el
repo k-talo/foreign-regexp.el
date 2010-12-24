@@ -85,6 +85,23 @@
 ;;     '(reb-re-syntax 'alien)) ;; Tell re-builder to use alien regexp.
 ;;
 ;;
+;; TERMINOLOGY
+;; ===========
+;; Technical terms appear in this document is as follows.
+;;
+;; ALIEN REGEXP:
+;;     A regular expression in syntax which is alien to Emacs.
+;;     Typically, it is not so much backslashy.
+;;     By default, Regular expressions in syntax of `Perl' and
+;;     `Ruby' can be used as ALIEN REGEXP with this library.
+;;
+;; EXTERNAL COMMAND:
+;;     An external program that gives Emacs the ability to handle
+;;     ALIEN REGEXP.
+;;     Commands written in `Perl' and `Ruby' are pre-defined in
+;;     this library.
+;;
+;;
 ;; USAGE EXAMPLE
 ;; =============
 ;;
@@ -414,6 +431,7 @@
 ;;
 ;; WISH LIST
 ;; =========
+;; - History for `re-builder'.
 ;; - `grep' with alien regexp?
 ;; - `tags-search', `tags-query-replace', `dried-do-search' and
 ;;   `dired-do-query-replace-regexp' with alien regexp?
