@@ -2846,6 +2846,10 @@ for isearch to use."
 (defvar alien-search/align/wsp-regexp "([ \\t]+)"
   "A regexp corresponding to white spaces.")
 
+(defvar alien-search/align/narrow-before-alien-search t
+  "Non-nil to narrow to the region before alien search is performed.
+This is for better performance of alien search.")
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2995,7 +2999,12 @@ When the value of an attribute `alien-type' of a rule is
 
     (alien-search/search/with-regarding-these-string-as-alien-regexp
         (regexp-lst)
-      ad-do-it)))
+      (save-restriction
+        (when (and alien-search/align/narrow-before-alien-search
+                   regexp-lst)
+          ;; For better performance of alien search.
+          (narrow-to-region)))
+        ad-do-it)))
 (ad-activate 'align-region)
 
 
