@@ -2790,6 +2790,70 @@ for isearch to use."
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+(defadvice align-region (around alien-search/align/align-region
+                                (beg end separate rules exclude-rules
+                                     &optional func))
+  "Run `align-region' with regarding a regexp in the rule
+which has an attribute `alien-type' as alien regexp.
+
+When the value of an attribute `alien-type' of a rule is
+
+   T:
+       The rule will be applied regardless of the current
+       `alien-type'.
+
+   LIST OF SYMBOLS:
+       The rule will be applied if current `alien-type' is
+       its member,
+
+   SYMBOL:
+       The rule will be applied if current `alien-type' is
+       `eq' to the SYMBOL.
+
+   ALL OTHERS:
+       The rule won't be applied."
+  (let ((regexp-lst nil)
+        (cooked-rules    (copy-list rules))
+        (cooked-ex-rules (copy-list exclude-rules)))
+    (dolist (cur-rules (list rules exclude-rules))
+      (dolist (rule cur-rules)
+        (when (assq 'alien-type rule)
+          (let ((alien-type (cdr (assq 'alien-type rule)))
+                (regexp     (cdr (assq 'regexp     rule))))
+            (cond
+             ((and (stringp regexp)
+                 
+                   (or ;; `aien-type' is
+                    ;; T
+                    (eq alien-type t) 
+                    ;; LIST
+                    (and (listp alien-type)
+                         (memq alien-search/alien-type alien-type))
+                    ;; SYMBOL
+                    (eq alien-type
+                        alien-search/alien-type)))
+              (push regexp regexp-lst))
+             (t
+              ;; Remove invalid rules.
+              (setq cooked-rules    (delq rule cooked-rules))
+              (setq cooked-ex-rules (delq rule cooked-ex-rules))))
+
+            ;; Modify original arguments.
+            (setq rules         cooked-rules)
+            (setq exclude-rules cooked-ex-rules)))))
+
+    (alien-search/search/with-regarding-these-string-as-alien-regexp
+        (regexp-lst)
+      ad-do-it)))
+(ad-activate 'align-region)
+
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Functions
 ;;
 ;; ----------------------------------------------------------------------------
