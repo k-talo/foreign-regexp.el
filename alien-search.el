@@ -1191,6 +1191,7 @@ and `alien-search/re-builder/occur-on-target-buffer'."
     (define-key search-map          "\M-F"  'alien-search/non-incremental/search-backward)
     (define-key search-map          "\M-g"  'nonincremental-repeat-search-forward)
     (define-key search-map          "\M-G"  'nonincremental-repeat-search-backward)
+    (define-key search-map          "\M-a"  'alien-search/align)
     (define-key search-map          "\M-l"  're-builder)
     (define-key search-map          "\M-\\" 'alien-search/quote-meta-in-region)
   
@@ -1202,6 +1203,7 @@ and `alien-search/re-builder/occur-on-target-buffer'."
     (define-key reb-mode-search-map "\M-F"  'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
     (define-key reb-mode-search-map "\M-g"  'alien-search/re-builder/non-incremental-search-forward-on-target-buffer)
     (define-key reb-mode-search-map "\M-G"  'alien-search/re-builder/non-incremental-search-backward-on-target-buffer)
+    (define-key reb-mode-search-map "\M-a"  'alien-search/re-builder/align-on-target-buffer)
     (define-key reb-mode-search-map "\M-l"  're-builder)
     (define-key reb-mode-search-map "\M-\\" 'alien-search/quote-meta-in-region)
   
@@ -2718,6 +2720,75 @@ for isearch to use."
 
 ;;; ===========================================================================
 ;;;
+;;;  `align' by alien regexp with a help from external command.
+;;;
+;;; ===========================================================================
+(require 'align)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Commands
+;;
+;; ----------------------------------------------------------------------------
+(defvar alien-search/align/default-wsp-pattern "([ \\t]+)"
+  "Default pattern corresponding to white spaces.")
+(defun alien-search/align (beg end regexp &optional group spacing repeat)
+  (interactive
+   (append
+    (list (region-beginning) (region-end))
+    (if current-prefix-arg
+        (list (alien-search/read-from-minibuf/with-search-option-indicator
+               (read-from-minibuffer "Complex align using alien regexp: "
+                                     alien-search/align/default-wsp-pattern
+                                     nil nil 'alien-search/history))
+              (string-to-number
+               (read-string
+                "Parenthesis group to modify (justify if negative): " "1"))
+              (string-to-number
+               (read-string "Amount of spacing (or column if negative): "
+                            (number-to-string align-default-spacing)))
+              (y-or-n-p "Repeat throughout line? "))
+      (list (concat alien-search/align/default-wsp-pattern
+                    (alien-search/read-from-minibuf/with-search-option-indicator
+                     (read-from-minibuffer "Align alien regexp: "
+                                           alien-search/align/default-wsp-pattern
+                                           nil nil 'alien-search/history)))
+            1 align-default-spacing nil))))
+  (let ((rule
+         (list (list nil (cons 'regexp regexp)
+                     (cons 'group (abs group))
+                     (if (< group 0)
+                         (cons 'justify t)
+                       (cons 'bogus nil))
+                     (if (>= spacing 0)
+                         (cons 'spacing spacing)
+                       (cons 'column (abs spacing)))
+                     (cons 'repeat repeat)))))
+          
+    (alien-search/search/with-regarding-string-as-alien-regexp (regexp)
+      (align-region beg end 'entire rule nil nil))))
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/align/available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defalias 'alien-search/align/available-p 'alien-search/search/available-p)
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/align/assert-available) => VOID or ERROR
+;; ----------------------------------------------------------------------------
+(defalias 'alien-search/align/assert-available 'alien-search/search/assert-available)
+
+
+;;; ===========================================================================
+;;;
 ;;;  quote meta characters of alien regexp by external command.
 ;;;
 ;;; ===========================================================================
@@ -2951,6 +3022,21 @@ current RE on `reb-target-buffer'."
     (alien-search/read-from-minibuf/with-initial-contents regexp
       (let ((this-command 'alien-search/non-incremental/search-backward))
         (call-interactively 'alien-search/non-incremental/search-backward)))))
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/re-builder/align-on-target-buffer) => VOID
+;; ----------------------------------------------------------------------------
+(defun alien-search/re-builder/align-on-target-buffer ()
+  "Run `alien-search/align with
+current RE on `reb-target-buffer'."
+  (interactive)
+  (alien-search/re-builder/assert-in-reb-buffer)
+  (alien-search/align/assert-available)
+  
+  (alien-search/re-builder/exec-with-current-re regexp
+    (alien-search/read-from-minibuf/with-initial-contents regexp
+      (let ((this-command 'alien-search/align))
+        (call-interactively 'alien-search/align)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (alien-search/re-builder/toggle-case-fold-on-target-buffer
@@ -3449,7 +3535,12 @@ to each search option changed hook."
             :op-kind    minibuf-cmd
             :command    alien-search/non-incremental/search-backward
             ;; required by minibuf-cmd.
-            :transition-allowed-in alien-search/non-incremental/search-backward))
+            :transition-allowed-in alien-search/non-incremental/search-backward)
+    (:label align
+            :op-kind    minibuf-cmd
+            :command    alien-search/align
+            ;; required by minibuf-cmd.
+            :transition-allowed-in alien-search/align))
     "Not documented yet.")
 
 
