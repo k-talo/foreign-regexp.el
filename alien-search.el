@@ -2921,7 +2921,7 @@ See also `align-regexp'."
       (list (concat alien-search/align/wsp-regexp
                     (alien-search/read-from-minibuf/with-search-option-indicator
                      (read-from-minibuffer "Align alien regexp: "
-                                           alien-search/align/wsp-regexp
+                                           nil
                                            nil nil 'alien-search/history)))
             1 align-default-spacing nil))))
   (let ((rule
