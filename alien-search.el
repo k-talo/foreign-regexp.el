@@ -3266,6 +3266,62 @@ to each search option changed hook."
 
 ;;; ===========================================================================
 ;;;
+;;;  Patches to `re-builder', restore cursor position on quitting.
+;;;
+;;; ===========================================================================
+
+;; XXX: This section should be moved to outside of this library.
+
+;; NOTE: `re-builder' moves cursor to beginning of buffer on quitting.
+;;       This is very annoying when we run other commands, such as
+;;       `alien-search/query-replace' and `alien-search/align', from
+;;       *RE-Builder* buffer. So here we made a patch which corrects
+;;       that behavior.
+
+(defvar alien-search/re-builder/targ-buf-state/.orig-pt)
+
+
+;; ----------------------------------------------------------------------------
+;;
+;;  Advices
+;;
+;; ----------------------------------------------------------------------------
+
+(defadvice re-builder (around alien-search/re-builder/targ-buf-state/save ())
+  "Save initial cursor position of the target buffer."
+  (setq alien-search/re-builder/targ-buf-state/.orig-pt (point))
+  ad-do-it)
+(ad-activate 're-builder)
+
+(defadvice reb-change-target-buffer (around alien-search/re-builder/targ-buf-state/update (buf))
+  "Update initial cursor position of the target buffer."
+  (when (window-live-p reb-target-window)
+    (set-window-buffer reb-target-window buf))
+  (with-current-buffer buf
+    (setq alien-search/re-builder/targ-buf-state/.orig-pt (point)))
+    ad-do-it)
+(ad-activate 'reb-change-target-buffer)
+
+(defadvice reb-quit (around alien-search/re-builder/targ-buf-state/restore ())
+  "Set cursor position of target buffer to initial state."
+  ad-do-it
+  (when (and (buffer-live-p reb-target-buffer)
+             alien-search/re-builder/targ-buf-state/.orig-pt)
+    (with-current-buffer reb-target-buffer
+      (goto-char alien-search/re-builder/targ-buf-state/.orig-pt)
+      (setq alien-search/re-builder/targ-buf-state/.orig-pt nil))))
+(ad-activate 'reb-quit)
+
+(defadvice reb-kill-buffer (around alien-search/re-builder/targ-buf-state/restore ())
+  "Set cursor position of target buffer to initial state."
+  (when (reb-mode-buffer-p)
+    (condition-case c (reb-quit) (error nil)))
+  ad-do-it)
+(ad-activate 'reb-kill-buffer)
+
+
+;;; ===========================================================================
+;;;
 ;;;  Non-incremental search for alien regexp with a help from external command.
 ;;;
 ;;; ===========================================================================
