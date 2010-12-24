@@ -365,13 +365,15 @@
 ;;
 ;;      See also `align-regexp'.
 ;;
-;; `C-u M-s M-a REGEXP <RET> NUM-GROUP <RET> NUM-SPACE <RET> THROUGHOUT <RET>'
-;; `C-u M-x alien-search/align <RET> REGEXP <RET> NUM-GROUP <RET> NUM-SPACE <RET> THROUGHOUT <RET>'
+;; `C-u M-s M-a REGEXP <RET> GROUP <RET> SPACING <RET> REPEAT <RET>'
+;; `C-u M-x alien-search/align <RET> REGEXP <RET> GROUP <RET> SPACING <RET> REPEAT <RET>'
 ;;
 ;;      Align the current region using a full alien regexp
 ;;      read from the minibuffer.
 ;;
 ;;      Example)
+;;
+;;        < Use regexp of Perl in this example. >
 ;;
 ;;        When texts in region is:
 ;;
@@ -382,17 +384,15 @@
 ;;
 ;;        Run command on the region with options:
 ;;
-;;             < Use regex of Perl in this example. >
-;;
 ;;             REGEXP: ([ \t]+)\d
 ;;                          |
-;;                          +--- NUM-GROUP: 1
+;;                          +--- GROUP: 1
 ;;                               Alignment will be applied to each
 ;;                               lines by inserting whitespaces to
 ;;                               the place where the sub-expression
-;;                               specified by NUM-GROUP is matched to.
-;;             NUM-SPACE: 1
-;;             THOUGHOUT: y
+;;                               specified by GROUP is matched to.
+;;             SPACING: 1
+;;             REPEAT:  y
 ;;
 ;;        Result is:
 ;;
@@ -400,8 +400,8 @@
 ;;             (ten       10)
 ;;             (hundred   100)
 ;;             (thousand 1000)
-;;                       |
-;;                       +---- Aligned using spaces NUM-SPACE unit.
+;;                      |
+;;                      +---- Aligned using spaces SPACING unit.
 ;;
 ;;      See also `align-regexp'.
 ;;
@@ -2843,15 +2843,62 @@ for isearch to use."
 ;;; ===========================================================================
 (require 'align)
 
+(defvar alien-search/align/default-wsp-regexp "([ \\t]*)"
+  "Default regexp corresponding to white spaces.")
+
 
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
-(defvar alien-search/align/default-wsp-regexp "([ \\t]+)"
-  "Default regexp corresponding to white spaces.")
+
+;; ----------------------------------------------------------------------------
+;;  (alien-search/align beg end regexp &optional group spacing repeat) => VOID
+;; ----------------------------------------------------------------------------
 (defun alien-search/align (beg end regexp &optional group spacing repeat)
+"Align the current region using a partial alien regexp
+read from the minibuffer.
+
+The alien regexp read from the minibuffer will be
+supposed to be placed after whitespaces.
+
+When called with prefix argument, align the current region
+using a full alien regexp read from the minibuffer.
+
+Example) 
+
+   < Use regexp of Perl in this example. >
+
+   When texts in region is:
+
+        (one 1)
+        (ten 10)
+        (hundred 100)
+        (thousand 1000)
+
+   Run command with prefix argument on the region with options:
+
+        REGEXP: ([ \t]+)\d
+                     |
+                     +--- GROUP: 1
+                          Alignment will be applied to each
+                          lines by inserting whitespaces to
+                          the place where the sub-expression
+                          specified by GROUP is matched to.
+        SPACING: 1
+        REPEAT : y
+
+   Result is:
+
+        (one       1)
+        (ten       10)
+        (hundred   100)
+        (thousand 1000)
+                 |
+                 +---- Aligned using spaces SPACING unit.
+
+See also `align-regexp'."
   (interactive
    (append
     (list (region-beginning) (region-end))
