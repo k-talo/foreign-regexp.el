@@ -2204,6 +2204,54 @@ when it has nil value.")
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
+;;  (alien-search/search/with-regarding-these-string-as-alien-regexp
+;;             (string-list &optional limit) &rest body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro alien-search/search/with-regarding-these-string-as-alien-regexp (args &rest body)
+  "Run BODY with applying `alien-search/search/forward' and
+`alien-search/search/backward' to member of STRING-LIST in
+substitution for `re-search-forward' and `re-search-backward'.
+
+Note that the equivalence of the STRING are tested in `eq'.
+
+When LIMIT is a number, match will be limited to the LIMIT.
+When LIMIT is NIL, match won't be limited.
+
+\(FN (STRING-LIST &OPTIONAL LIMIT) &REST BODY)"
+  (declare (indent 1))
+  (let ((g-orig-re-fwd-fn  (gensym))
+        (g-orig-re-bkwd-fn (gensym))
+        (g-regexp-lst      (gensym))
+        (g-limit           (gensym))
+        (g-args            (gensym)))
+    `(let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
+           (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
+       (unwind-protect
+           (lexical-let ((,g-regexp-lst ,(nth 0 args))
+                         (,g-limit      ,(nth 1 args)))
+             (setf (symbol-function 're-search-forward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((memq regexp ,g-regexp-lst)
+                       (funcall 'alien-search/search/forward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-fwd-fn 
+                                regexp bound noerror count)))))
+             (setf (symbol-function 're-search-backward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((memq regexp ,g-regexp-lst)
+                       (funcall 'alien-search/search/backward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-bkwd-fn
+                                regexp bound noerror count)))))
+             ,@body)
+         (setf (symbol-function 're-search-forward)  ,g-orig-re-fwd-fn)
+         (setf (symbol-function 're-search-backward) ,g-orig-re-bkwd-fn)))))
+
+;; ----------------------------------------------------------------------------
 ;;  (alien-search/search/with-regarding-string-as-alien-regexp
 ;;                  (string &optional limit) &rest body) => RESULT OF BODYFORM
 ;; ----------------------------------------------------------------------------
@@ -2219,39 +2267,10 @@ When LIMIT is NIL, match won't be limited.
 
 \(FN (STRING &OPTIONAL LIMIT) &REST BODY)"
   (declare (indent 1))
-  (let ((g-orig-re-fwd-fn  (gensym))
-        (g-orig-re-bkwd-fn (gensym))
-        (g-regexp          (gensym))
-        (g-limit           (gensym))
-        (g-args            (gensym)))
-    `(let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
-           (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
-       (unwind-protect
-           (lexical-let ((,g-regexp ,(nth 0 args))
-                         (,g-limit  ,(nth 1 args)))
-             (setf (symbol-function 're-search-forward)
-                   (lambda (regexp &optional bound noerror count)
-                     (cond
-                      ((eq regexp
-                           ,g-regexp)
-                       (funcall 'alien-search/search/forward
-                                regexp bound noerror count ,g-limit))
-                      (t
-                       (funcall ,g-orig-re-fwd-fn 
-                                regexp bound noerror count)))))
-             (setf (symbol-function 're-search-backward)
-                   (lambda (regexp &optional bound noerror count)
-                     (cond
-                      ((eq regexp
-                           ,g-regexp)
-                       (funcall 'alien-search/search/backward
-                                regexp bound noerror count ,g-limit))
-                      (t
-                       (funcall ,g-orig-re-bkwd-fn
-                                regexp bound noerror count)))))
-             ,@body)
-         (setf (symbol-function 're-search-forward)  ,g-orig-re-fwd-fn)
-         (setf (symbol-function 're-search-backward) ,g-orig-re-bkwd-fn)))))
+  `(alien-search/search/with-regarding-these-string-as-alien-regexp
+       ((list ,(nth 0 args))
+        ,(nth 1 args))
+     ,@body))
 
 ;; ----------------------------------------------------------------------------
 ;;
