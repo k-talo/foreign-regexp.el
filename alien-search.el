@@ -3001,9 +3001,10 @@ When the value of an attribute `alien-type' of a rule is
         (regexp-lst)
       (save-restriction
         (when (and alien-search/align/narrow-before-alien-search
-                   regexp-lst)
+                   regexp-lst
+                   beg end)
           ;; For better performance of alien search.
-          (narrow-to-region)))
+          (narrow-to-region (min beg end) (max beg end))))
         ad-do-it)))
 (ad-activate 'align-region)
 
