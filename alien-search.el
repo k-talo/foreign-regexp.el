@@ -396,12 +396,12 @@
 ;;
 ;;        Result is:
 ;;
-;;             (one       1)
-;;             (ten       10)
-;;             (hundred   100)
+;;             (one      1)
+;;             (ten      10)
+;;             (hundred  100)
 ;;             (thousand 1000)
 ;;                      |
-;;                      +---- Aligned using spaces SPACING unit.
+;;                      +---- Aligned using SPACING spaces.
 ;;
 ;;      See also `align-regexp'.
 ;;
