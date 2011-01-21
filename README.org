@@ -11,7 +11,7 @@ This library is an extension of `shell-command'.
 
 What this library does are:
 
-1. Search for a regexp(*1)) from text in current buffer by
+1. Search for a regexp(*1) from text in current buffer by
    external command(*2).
    
    (*1) You can write regexp with syntax of external command.
