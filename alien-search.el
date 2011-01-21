@@ -87,7 +87,7 @@
 ;;
 ;; TERMINOLOGY
 ;; ===========
-;; Technical terms appear in this document is as follows.
+;; Technical terms appear in this document are as follows.
 ;;
 ;; ALIEN REGEXP:
 ;;     A regular expression in syntax which is alien to Emacs.
