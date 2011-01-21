@@ -14,15 +14,15 @@ What this library does are:
 1. Search for a regexp(*1)) from text in current buffer by
    external command(*2).
    
-   - (*1) You can write regexp with syntax of external command.
+   (*1) You can write regexp with syntax of external command.
 
-   - (*2) External commands written in Perl (v5.8 or later
-     is required) and Ruby (v1.9 or later is required)
-     are pre-defined in this file.
-     To use regexp syntax of your choice, you can
-     write your own external command.
-
-
+   (*2) External commands written in Perl (v5.8 or later
+        is required) and Ruby (v1.9 or later is required)
+        are pre-defined in this file.
+        To use regexp syntax of your choice, you can
+        write your own external command.
+   
+   
 2. Let us browse search results from an external command via
    Emacs user interface like `occur' and `isearch'.
    
