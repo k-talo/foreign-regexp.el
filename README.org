@@ -1,10 +1,12 @@
 #+STARTUP: indent
 * alien-search
 ** CAUTION
+
 THIS LIBRARY IS VERY EXPERIMENTAL!!!
 
 
 ** Overview
+
 This library is an extension of `shell-command'.
 
 What this library does are:
@@ -28,6 +30,7 @@ What this library does are:
 
 
 ** REQUIREMENTS
+
 By shell scripts defined in this file as default external commands,
 perl (>= 5.8) or ruby (>= 1.9) is required.
 
@@ -38,84 +41,89 @@ For better multilingual support, Emacs (>= 21) may be required.
 
 ** INSTALLING
 To install this library, save this file to a directory in your
-`load-path' (you can view the current `load-path' using "C-h v
-load-path <RET>" within Emacs), then add the following lines to
-your .emacs start up file:
+` =load-path= ' (you can view the current ` =load-path= ' using
+` =C-h v load-path <RET>= ' within Emacs), then add the following
+lines to your =.emacs= start up file:
 
-#+begin_src emacs-lisp
+#+BEGIN_EXAMPLE
   (require 'alien-search)
   
   (custom-set-variables
   '(alien-search/alien-type 'perl) ;; Choose by your preference.
   '(reb-re-syntax 'alien)) ;; Tell re-builder to use alien regexp.
-#+end_src
+#+END_EXAMPLE
 
 ** TERMINOLOGY
 Technical terms appear in this document is as follows.
 
-- ALIEN REGEXP ::
-     A regular expression in syntax which is alien to Emacs.
-     Typically, it is not so much backslashy.
-     By default, Regular expressions in syntax of `Perl' and
-     `Ruby' can be used as ALIEN REGEXP with this library.
-- EXTERNAL COMMAND ::
-     An external program that gives Emacs the ability to handle
-     ALIEN REGEXP.
-     Commands written in `Perl' and `Ruby' are pre-defined in
-     this library.
+- ALIEN REGEXP
+  A regular expression in syntax which is alien to Emacs.
+  Typically, it is not so much backslashy.
+  By default, Regular expressions in syntax of `Perl' and
+  `Ruby' can be used as ALIEN REGEXP with this library.
+  
+- EXTERNAL COMMAND
+  An external program that gives Emacs the ability to handle
+  ALIEN REGEXP.
+  Commands written in `Perl' and `Ruby' are pre-defined in
+  this library.
 
 
 ** USAGE EXAMPLE
- [Example-1] Query Replace in manner of Perl.
+*** [Example-1] Query Replace in manner of Perl.
 
-   STEP-1: Set alien-type to Perl.
+**** STEP-1: Set alien-type to Perl.
 
-        `M-x alien-search/alien-type/set <RET> perl <RET>'
+: M-x alien-search/alien-type/set <RET> perl <RET>
 
-        NOTE: Once you choose ALIEN-TYPE, Emacs will remember it
-              until exit. You can also set and save ALIEN-TYPE for
-              next Emacs session by setting value via customize.
-              See "COMMANDS(1)" section in this document.
+- NOTE
+  Once you choose ALIEN-TYPE, Emacs will remember it
+  until exit. You can also set and save ALIEN-TYPE for
+  next Emacs session by setting value via customize.
+  See "COMMANDS (1)" section in this document.
 
-   STEP-2: Run query replace 
+**** STEP-2: Run query replace 
 
-        `M-s M-% (\d+)---(\d+) <RET> ${1}456${2} <RET>'
+: M-s M-% (\d+)---(\d+) <RET> ${1}456${2} <RET>
 
-        This command replaces text in buffer:
+This command replaces text in buffer:
 
-           123---789
+: 123---789
 
-        with text:
+with text:
 
-           123456789
+: 123456789
 
-        Variables in replacement string are interpolated by Perl.
+Variables in replacement string are interpolated by Perl.
 
 
- [Example-2] Query Replace in manner of Ruby.
+*** [Example-2] Query Replace in manner of Ruby.
 
-   STEP-1: Set alien-type to Ruby.
+**** STEP-1: Set alien-type to Ruby.
 
-        `M-x alien-search/alien-type/set <RET> ruby <RET>'
+: M-x alien-search/alien-type/set <RET> ruby <RET>
 
-   STEP-2: Run query replace 
+**** STEP-2: Run query replace 
 
-        `M-s M-% (\d+)---(\d+) <RET> #{$1}456#{$2} <RET>'
+: M-s M-% (\d+)---(\d+) <RET> #{$1}456#{$2} <RET>
 
-        This command replaces text in buffer:
+This command replaces text in buffer:
 
-           123---789
+: 123---789
 
-        with text:
+with text:
 
-           123456789
+: 123456789
 
-        Variables in replacement string are interpolated by ruby
-        as if it ware in the string inside of a block of "gsub"
-        method.
+Variables in replacement string are interpolated by ruby
+as if it ware in the string inside of a block of "gsub"
+method.
+
 
 ** COMMANDS
-*** (1): SETTING ALIEN-TYPE
+
+*** (1) SETTING ALIEN-TYPE
+
 : M-x alien-search/alien-type/set <RET> ALIEN-TYPE <RET>
 
 Set type of regexp syntax to ALIEN-TYPE.
@@ -126,10 +134,12 @@ You can also set ALIEN-TYPE via customization interface:
 : M-x customize-apropos <RET> alien-search/alien-type <RET>
 
 
-*** (2): SEARCH AND REPLACEMENT
- NOTE: While editing a regular expression on the minibuffer prompt
-       of `alien-search' commands below, you can switch to another
-       `alien-search' command without losing current editing state.
+*** (2) SEARCH AND REPLACEMENT
+
+- NOTE
+  While editing a regular expression on the minibuffer prompt
+  of `alien-search' commands below, you can switch to another
+  `alien-search' command without losing current editing state.
 
 : M-s M-o REGEXP <RET>
 : M-x alien-search/occur <RET> REGEXP <RET>
@@ -175,12 +185,14 @@ Search forward for the previous search string or regexp.
 Search backward for the previous search string or regexp.
 
 
-*** (3): WORKING WITH SEARCH OPTIONS
-NOTE: The status of each search option will be displayed by an
-      indicator which is put on the minibuffer prompt of each
-      `alien-search' command, or put on the mode-line of a
-      buffer `*RE-Builder*'. The indicator will be displayed
-      like these: "[isx]" for perl, "[imx]" for ruby.
+*** (3) WORKING WITH SEARCH OPTIONS
+
+- NOTE
+  The status of each search option will be displayed by an
+  indicator which is put on the minibuffer prompt of each
+  `alien-search' command, or put on the mode-line of a
+  buffer `*RE-Builder*'. The indicator will be displayed
+  like these: "[isx]" for perl, "[imx]" for ruby.
        
 : M-s M-i
 : M-x alien-search/toggle-case-fold <RET>
@@ -211,10 +223,10 @@ Start an interactive construction of a regexp with
 `re-builder'.
 (See also documents of `re-builder')
 
-****  NOTE-1
-To apply the regexp, which was constructed with
-`re-builder', to the `alien-search' commands,
-call commands below in `*RE-Builder*' buffer:
+- NOTE-1
+  To apply the regexp, which was constructed with
+  `re-builder', to the `alien-search' commands,
+  call commands below in `*RE-Builder*' buffer:
 
 : M-s M-o
 : M-x alien-search/re-builder/occur-on-target-buffer
@@ -253,9 +265,9 @@ Run `alien-search/non-incremental/search-backward' in `reb-target-buffer'
 with an alien regexp in the buffer `*RE-Builder*'.
 
 
-**** NOTE-2
-You can switch search options of the
-`reb-target-buffer' with commands below:
+- NOTE
+  You can switch search options of the
+  `reb-target-buffer' with commands below:
 
 : M-s M-i
 : M-x alien-search/re-builder/toggle-case-fold-on-target-buffer
@@ -281,7 +293,7 @@ Escape characters in region, that would have special meaning
 in alien regexp.
 
 
-*** (5): ALIGNMENT USING ALIEN REGEXP
+*** (5) ALIGNMENT USING ALIEN REGEXP
 
 : C-M-|
 : M-x align
@@ -292,7 +304,7 @@ Alien regexp can be used in a rule by putting an
 `alien-type' attribute on the rule.
 
 Example)
-#+begin_src emacs-lisp
+#+BEGIN_EXAMPLE
   (add-to-list
    'align-rules-list
    '(perl-and-ruby-hash-form
@@ -305,11 +317,10 @@ Example)
      (group  . 1)
      (repeat . t)
      (modes  . '(perl-mode cperl-mode ruby-mode))))
-#+end_src
+#+END_EXAMPLE
 
 See also `align-rules-list' and help document of an advice
 of `align-region' for more information about alignment rules.
-
 
 : M-s M-a REGEXP <RET>
 : M-x alien-search/align <RET> REGEXP <RET>
@@ -329,9 +340,9 @@ Align the current region using a full alien regexp
 read from the minibuffer.
 
 Example)
-#+BEGIN_EXAMPLE
   < Use regexp of Perl in this example. >
-  
+
+#+BEGIN_EXAMPLE
   When texts in region is:
   
        (one 1)
@@ -347,7 +358,7 @@ Example)
                          Alignment will be applied to each
                          lines by inserting whitespaces to
                          the place where the sub-expression
-                         specified by GROUP is matched to.
+                         specified by `GROUP' is matched to.
        SPACING: 1
        REPEAT:  y
   
