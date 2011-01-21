@@ -11,23 +11,23 @@ This library is an extension of `shell-command'.
 
 What this library does are:
 
-1. Search for a regexp[fn:1]) from text in current buffer by
-   external command[fn:2].
+1. Search for a regexp(*1)) from text in current buffer by
+   external command(*2).
    
+   - (*1) You can write regexp with syntax of external command.
+
+   - (*2) External commands written in Perl (v5.8 or later
+     is required) and Ruby (v1.9 or later is required)
+     are pre-defined in this file.
+     To use regexp syntax of your choice, you can
+     write your own external command.
+
+
 2. Let us browse search results from an external command via
    Emacs user interface like `occur' and `isearch'.
    
    Also let us apply results of the replacement operation by an
    external command via `query-replace' interface.
-
-[fn:1] You can write regexp with syntax of external command.
-
-[fn:2] External commands written in Perl (v5.8 or later
-       is required) and Ruby (v1.9 or later is required)
-       are pre-defined in this file.
-       To use regexp syntax of your choice, you can
-       write your own external command.
-
 
 
 ** REQUIREMENTS
