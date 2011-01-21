@@ -1,5 +1,5 @@
 #+STARTUP: indent
-* alien-search
+* alien-search.el --- search and replace by regexp which is alien to Emacs.
 ** CAUTION
 
 THIS LIBRARY IS VERY EXPERIMENTAL!!!
@@ -70,13 +70,14 @@ Technical terms appear in this document is as follows.
 
 
 ** USAGE EXAMPLE
+
 *** [Example-1] Query Replace in manner of Perl.
 
 **** STEP-1: Set alien-type to Perl.
 
 : M-x alien-search/alien-type/set <RET> perl <RET>
 
-- NOTE
+- NOTE ::
   Once you choose ALIEN-TYPE, Emacs will remember it
   until exit. You can also set and save ALIEN-TYPE for
   next Emacs session by setting value via customize.
@@ -136,7 +137,7 @@ You can also set ALIEN-TYPE via customization interface:
 
 *** (2) SEARCH AND REPLACEMENT
 
-- NOTE
+- NOTE ::
   While editing a regular expression on the minibuffer prompt
   of `alien-search' commands below, you can switch to another
   `alien-search' command without losing current editing state.
@@ -187,7 +188,7 @@ Search backward for the previous search string or regexp.
 
 *** (3) WORKING WITH SEARCH OPTIONS
 
-- NOTE
+- NOTE ::
   The status of each search option will be displayed by an
   indicator which is put on the minibuffer prompt of each
   `alien-search' command, or put on the mode-line of a
@@ -223,7 +224,7 @@ Start an interactive construction of a regexp with
 `re-builder'.
 (See also documents of `re-builder')
 
-- NOTE-1
+- NOTE-1 ::
   To apply the regexp, which was constructed with
   `re-builder', to the `alien-search' commands,
   call commands below in `*RE-Builder*' buffer:
@@ -265,7 +266,7 @@ Run `alien-search/non-incremental/search-backward' in `reb-target-buffer'
 with an alien regexp in the buffer `*RE-Builder*'.
 
 
-- NOTE
+- NOTE ::
   You can switch search options of the
   `reb-target-buffer' with commands below:
 
