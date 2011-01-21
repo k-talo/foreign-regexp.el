@@ -11,22 +11,23 @@ This library is an extension of `shell-command'.
 
 What this library does are:
 
-1. Search for a regexp(*1) from text in current buffer by
-   external command(*2).
+1. Search for a regexp[fn:1]) from text in current buffer by
+   external command[fn:2].
    
-   (*1) You can write regexp with syntax of external command.
+   [fn:1] You can write regexp with syntax of external command.
    
-   (*2) External commands written in Perl (v5.8 or later
-        is required) and Ruby (v1.9 or later is required)
-        are pre-defined in this file.
-        To use regexp syntax of your choice, you can
-        write your own external command.
-
+   [fn:2] External commands written in Perl (v5.8 or later
+          is required) and Ruby (v1.9 or later is required)
+          are pre-defined in this file.
+          To use regexp syntax of your choice, you can
+          write your own external command.
+   
 2. Let us browse search results from an external command via
    Emacs user interface like `occur' and `isearch'.
    
    Also let us apply results of the replacement operation by an
    external command via `query-replace' interface.
+
 
 
 ** REQUIREMENTS
@@ -41,8 +42,8 @@ For better multilingual support, Emacs (>= 21) may be required.
 
 ** INSTALLING
 To install this library, save this file to a directory in your
-` =load-path= ' (you can view the current ` =load-path= ' using
-` =C-h v load-path <RET>= ' within Emacs), then add the following
+=load-path= (you can view the current =load-path= using
+=C-h v load-path <RET>= within Emacs), then add the following
 lines to your =.emacs= start up file:
 
 #+BEGIN_EXAMPLE
@@ -54,15 +55,15 @@ lines to your =.emacs= start up file:
 #+END_EXAMPLE
 
 ** TERMINOLOGY
-Technical terms appear in this document is as follows.
+Technical terms appear in this document are as follows.
 
-- ALIEN REGEXP
+- ALIEN REGEXP ::
   A regular expression in syntax which is alien to Emacs.
   Typically, it is not so much backslashy.
   By default, Regular expressions in syntax of `Perl' and
   `Ruby' can be used as ALIEN REGEXP with this library.
   
-- EXTERNAL COMMAND
+- EXTERNAL COMMAND ::
   An external program that gives Emacs the ability to handle
   ALIEN REGEXP.
   Commands written in `Perl' and `Ruby' are pre-defined in
@@ -81,7 +82,7 @@ Technical terms appear in this document is as follows.
   Once you choose ALIEN-TYPE, Emacs will remember it
   until exit. You can also set and save ALIEN-TYPE for
   next Emacs session by setting value via customize.
-  See "COMMANDS (1)" section in this document.
+  See "COMMANDS (1) SETTING ALIEN-TYPE" section in this document.
 
 **** STEP-2: Run query replace 
 
