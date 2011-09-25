@@ -504,7 +504,7 @@
 ;;;
 ;;; ===========================================================================
 
-(defcustom alien-search/tmp-dir "/tmp/"
+(defcustom alien-search/tmp-dir temporary-file-directory
   "Directory in which temporally files should be written."
   :type 'string
   :group 'alien-search)
