@@ -452,6 +452,7 @@
 (eval-when-compile
   (require 'cl)
   (require 'menu-bar)
+  (require 'easymenu)
   (require 're-builder))
 
 
@@ -2673,9 +2674,9 @@ more information."
   (foreign-regexp/isearch/assert-available)
   
   ;; Setup `isearch-search-fun-function'.
-  (when (not (boundp 'foreign-regexp/isearch/orig-isearch-search-fun-function))
-    (setq foreign-regexp/isearch/orig-isearch-search-fun-function
-          isearch-search-fun-function))
+  (when (not (boundp 'foreign-regexp/isearch/.orig-isearch-search-fun-function))
+    (defvar foreign-regexp/isearch/.orig-isearch-search-fun-function
+      isearch-search-fun-function))
   (setq isearch-search-fun-function #'foreign-regexp/isearch/isearch-search-fun-function)
   (add-hook 'isearch-mode-end-hook
             'foreign-regexp/isearch/.isearch-mode-end-hook-fn)
@@ -2700,9 +2701,9 @@ more information."
   (foreign-regexp/isearch/assert-available)
   
   ;; Setup `isearch-search-fun-function'.
-  (when (not (boundp 'foreign-regexp/isearch/orig-isearch-search-fun-function))
-    (setq foreign-regexp/isearch/orig-isearch-search-fun-function
-          isearch-search-fun-function))
+  (when (not (boundp 'foreign-regexp/isearch/.orig-isearch-search-fun-function))
+    (defvar foreign-regexp/isearch/.orig-isearch-search-fun-function
+      isearch-search-fun-function))
   (setq isearch-search-fun-function #'foreign-regexp/isearch/isearch-search-fun-function)
   (add-hook 'isearch-mode-end-hook
             'foreign-regexp/isearch/.isearch-mode-end-hook-fn)
@@ -2793,10 +2794,10 @@ to each search option changed hook."
 (defun foreign-regexp/isearch/.isearch-mode-end-hook-fn ()
   "Clean up environment when isearch by foreign-regexp is finished."
   (when (not isearch-nonincremental)
-    (when (boundp 'foreign-regexp/isearch/orig-isearch-search-fun-function)
+    (when (boundp 'foreign-regexp/isearch/.orig-isearch-search-fun-function)
       (setq isearch-search-fun-function
-            foreign-regexp/isearch/orig-isearch-search-fun-function)
-      (makunbound 'foreign-regexp/isearch/orig-isearch-search-fun-function))
+            foreign-regexp/isearch/.orig-isearch-search-fun-function)
+      (makunbound 'foreign-regexp/isearch/.orig-isearch-search-fun-function))
     
     ;; Just for prompt message.
     (foreign-regexp/ad-disable 'isearch-message-prefix 'after 'foreign-regexp/isearch/modify-prompt)
@@ -3661,7 +3662,7 @@ to each search option changed hook."
   (interactive)
   (prog1
       (cond
-       ((called-interactively-p)
+       ((called-interactively-p 'interactive)
         (call-interactively 'foreign-regexp/search/forward))
        (t
         (foreign-regexp/search/forward regexp)))
@@ -3676,7 +3677,7 @@ to each search option changed hook."
   (interactive)
   (prog1
       (cond
-       ((called-interactively-p)
+       ((called-interactively-p 'interactive)
         (call-interactively 'foreign-regexp/search/backward))
        (t
         (foreign-regexp/search/backward regexp)))
