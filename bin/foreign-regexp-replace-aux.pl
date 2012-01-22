@@ -83,7 +83,7 @@ sub main () {
     
     print $fh_out "(setq result '(", "\n";
     
-    while ($str_in =~ m/${str_pat}/omg) {
+    while ($str_in =~ m/${pat}/omg) {
         my $replacement = eval { $build_replacement_fn->() };
         die "Error while interpolating replacement \"${str_repl}\":\n${EVAL_ERROR}" if $EVAL_ERROR;
             
