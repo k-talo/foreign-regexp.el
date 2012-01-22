@@ -452,8 +452,8 @@
 (eval-when-compile
   (require 'cl)
   (require 'menu-bar)
-  (require 'easymenu)
-  (require 're-builder))
+  (require 'easymenu))
+(require 're-builder)
 
 
 ;;; ===========================================================================
