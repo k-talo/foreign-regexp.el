@@ -6,6 +6,7 @@
 ;; Created: Sun Nov 28 23:50:45 2010 JST
 ;; Keywords: convenience emulations matching tools unix wp
 ;; Revision: $Id$
+;; Version: 0.0
 ;; URL: 
 ;; GitHub: http://github.com/k-talo/foreign-regexp.el
 
