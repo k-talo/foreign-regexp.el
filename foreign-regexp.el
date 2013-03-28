@@ -2250,7 +2250,7 @@ Seven arguments describe below will be passed to the command.
                  SUB-MATCH-1-IN-1st-MATCH-START SUB-MATCH-1-IN-1st-MATCH-END
                  SUB-MATCH-2-IN-1st-MATCH-START SUB-MATCH-2-IN-1st-MATCH-END
                  ...)
-                (2nd-MATCH-START 2nd-MATCH-END)
+                (2nd-MATCH-START 2nd-MATCH-END
                  SUB-MATCH-1-IN-2nd-MATCH-START SUB-MATCH-1-IN-2nd-MATCH-END
                  SUB-MATCH-2-IN-2nd-MATCH-START SUB-MATCH-2-IN-2nd-MATCH-END
                  ...)
