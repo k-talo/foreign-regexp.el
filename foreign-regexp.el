@@ -1,4 +1,4 @@
-;; foreign-regexp.el --- search and replace by foreign regexp.
+;;; foreign-regexp.el --- search and replace by foreign regexp.
 
 ;; Copyright (C) 2010-2012 K-talo Miyazaki, all rights reserved.
 
