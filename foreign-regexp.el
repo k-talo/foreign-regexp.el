@@ -701,6 +701,17 @@ See also the function `throw' for more info."
 ;;                                       regexp replacement &rest other-args)
 ;;                                                                   => RESULT
 ;; ----------------------------------------------------------------------------
+(defun foreign-regexp/.w32-call-process (program &optional infile buffer display &rest args)
+  "On MS Windows, `call-process' won't run shell scripts properly.
+This is workaround for this behavior."
+  (call-process "sh" ;; Shall we use `shell-file-name'?
+		nil buffer nil "-c"
+		(apply #'concat
+		       (shell-quote-argument program) " "
+		       (mapcar '(lambda (arg)
+				  (concat (shell-quote-argument arg) " "))
+			       args))))
+
 (defun foreign-regexp/run-external-command (cmd-path shell-script
                                                      body
                                                      regexp
@@ -759,7 +770,9 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           ;;(message "[foreign-regexp] Running...")
           
           ;; Do search by external command.
-          (let ((status (apply #'call-process
+          (let ((status (apply (if (eq window-system 'w32)
+				   #'foreign-regexp/.w32-call-process
+				   #'call-process)
                                `(,cmd-path
                                  nil ,(buffer-name proc-output-buf) nil
                                  ,@(if body (list fn-out-body) nil)
