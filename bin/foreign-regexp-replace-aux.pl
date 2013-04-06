@@ -39,7 +39,6 @@ sub eval_and_interpolate_replacement {
 
 sub escape_str_to_eval {
     my $r_txt = shift;
-    ${$r_txt} =~ s/\\/\\\\/og;
     ${$r_txt} =~ s/"/\\"/og;
 }
 
