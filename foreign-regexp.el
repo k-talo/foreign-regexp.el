@@ -730,32 +730,31 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
     (unwind-protect
         (progn
 
-          ;; Save information, which have to be passed to 
-          ;; external command, to temporally files.
-          (unwind-protect 
-              (progn
-                (set-default-file-modes #o0600)
-                
-                (when body
-                  (with-temp-file fn-out-body
-                    (set-buffer-file-coding-system coding-sys-out)
-                    (insert body)))
-                (with-temp-file fn-out-regexp
-                  (set-buffer-file-coding-system coding-sys-out)
-                  (insert regexp))
-                (when replacement
-                  (with-temp-file fn-out-replacement
-                    (set-buffer-file-coding-system coding-sys-out)
-                    (insert replacement))))
-            (set-default-file-modes orig-file-modes))
+          (let ((enable-local-variables nil) ;; Ignore `code' variable.
+                (coding-system-for-write coding-sys-out))
+            
+            ;; Save information, which have to be passed to 
+            ;; external command, to temporally files.
+            (unwind-protect 
+                (progn
+                  (set-default-file-modes #o0600)
+                  
+                  (when body
+                    (with-temp-file fn-out-body
+                      (insert body)))
+                  (with-temp-file fn-out-regexp
+                    (insert regexp))
+                  (when replacement
+                    (with-temp-file fn-out-replacement
+                      (insert replacement))))
+              (set-default-file-modes orig-file-modes))
 
-          ;; Save shell-script to file when required.
-          (when (not cmd-path)
-            (with-temp-file fn-cmd
-              (set-buffer-file-coding-system coding-sys-out)
-              (insert shell-script))
-            (set-file-modes fn-cmd #o0700)
-            (setq cmd-path fn-cmd))
+            ;; Save shell-script to file when required.
+            (when (not cmd-path)
+              (with-temp-file fn-cmd
+                (insert shell-script))
+              (set-file-modes fn-cmd #o0700)
+              (setq cmd-path fn-cmd)))
           
           ;;(message "[foreign-regexp] Running...")
           
