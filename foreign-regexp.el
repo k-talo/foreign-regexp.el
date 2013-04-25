@@ -428,10 +428,14 @@
 ;; ==============
 ;; - Codes aside, this document should be rewritten.
 ;;   My English sucks :-(
+;; - On M$-Windows system, virus scanners makes
+;;   foreign regexp commands extremely slow.
 ;;
 ;;
 ;; WISH LIST
 ;; =========
+;; - Better documents.
+;; - Better error messages.
 ;; - History for `re-builder'.
 ;; - `grep' with foreign regexp?
 ;; - `tags-search', `tags-query-replace', `dried-do-search' and
@@ -439,7 +443,6 @@
 ;; - `multi-isearch-buffers-regexp', `multi-occur',
 ;;   `multi-occur-in-matching-buffers', `how-many', `flush-lines',
 ;;   and `keep-lines' with foreign regexp?
-;; - Better error messages.
 ;; - Write Tests.
 
 ;;; Change Log:
@@ -704,7 +707,7 @@ See also the function `throw' for more info."
 (defun foreign-regexp/.w32-call-process (program &optional infile buffer display &rest args)
   "On MS Windows, `call-process' won't run shell scripts properly.
 This is workaround for this behavior."
-  (call-process "sh" ;; Shall we use `shell-file-name'?
+  (call-process "sh" ;; XXX: Shoud we use `shell-file-name'?
 		nil buffer nil "-c"
 		(apply #'concat
 		       (shell-quote-argument program) " "
