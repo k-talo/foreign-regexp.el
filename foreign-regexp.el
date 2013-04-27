@@ -2535,13 +2535,13 @@ cache won't be cleared."
   (condition-case c
       (when (not (and (symbolp this-command)
                       (get this-command
-                           'foreign-regexp/search/ongoing-search-cmd)))
+                           'foreign-regexp/search/ongoing-search-cmd-p)))
         (foreign-regexp/search/cache/clear-all))
     (error
      (message "[foreign-regexp] %s" (error-message-string c)))))
 
-(put 'isearch-repeat-forward  'foreign-regexp/search/ongoing-search-cmd t)
-(put 'isearch-repeat-backward 'foreign-regexp/search/ongoing-search-cmd t)
+(put 'isearch-repeat-forward  'foreign-regexp/search/ongoing-search-cmd-p t)
+(put 'isearch-repeat-backward 'foreign-regexp/search/ongoing-search-cmd-p t)
 
 (add-hook 'pre-command-hook 'foreign-regexp/search/cache/pre-command-hook-fn)
 
@@ -3345,7 +3345,7 @@ current RE on `reb-target-buffer'."
     (t
      ad-do-it)))
 (foreign-regexp/ad-activate 'reb-next-match)
-(put 'reb-next-match  'foreign-regexp/search/ongoing-search-cmd t)
+(put 'reb-next-match  'foreign-regexp/search/ongoing-search-cmd-p t)
 
 (defadvice reb-prev-match (around foreign-regexp/re-builder/prev-match ())
   (case reb-re-syntax
@@ -3360,7 +3360,7 @@ current RE on `reb-target-buffer'."
     (t
      ad-do-it)))
 (foreign-regexp/ad-activate 'reb-prev-match)
-(put 'reb-prev-match 'foreign-regexp/search/ongoing-search-cmd t)
+(put 'reb-prev-match 'foreign-regexp/search/ongoing-search-cmd-p t)
 
 (defadvice reb-copy (around foreign-regexp/re-builder/copy ())
   (case reb-re-syntax
@@ -3369,7 +3369,7 @@ current RE on `reb-target-buffer'."
      (kill-new (buffer-substring-no-properties (point-min) (point-max))))
     (t ad-do-it)))
 (foreign-regexp/ad-activate 'reb-copy)
-(put 'reb-copy 'foreign-regexp/search/ongoing-search-cmd t)
+(put 'reb-copy 'foreign-regexp/search/ongoing-search-cmd-p t)
 
 (defadvice reb-change-syntax (around foreign-regexp/re-builder/change-syntax (&optional syntax))
   (interactive
@@ -3596,9 +3596,9 @@ to each search option changed hook."
 (add-hook 'reb-mode-hook
           'foreign-regexp/re-builder/setup-search-option-changed-hook)
 
-(put 'reb-enter-subexp-mode 'foreign-regexp/search/ongoing-search-cmd t)
-(put 'reb-quit-subexp-mode  'foreign-regexp/search/ongoing-search-cmd t)
-(put 'reb-display-subexp    'foreign-regexp/search/ongoing-search-cmd t)
+(put 'reb-enter-subexp-mode 'foreign-regexp/search/ongoing-search-cmd-p t)
+(put 'reb-quit-subexp-mode  'foreign-regexp/search/ongoing-search-cmd-p t)
+(put 'reb-display-subexp    'foreign-regexp/search/ongoing-search-cmd-p t)
 
 
 ;;; ===========================================================================
@@ -3717,7 +3717,7 @@ to each search option changed hook."
        (t
         ad-do-it)))
     (foreign-regexp/ad-activate 'nonincremental-repeat-search-forward)
-    (put 'nonincremental-repeat-search-forward 'foreign-regexp/search/ongoing-search-cmd t))
+    (put 'nonincremental-repeat-search-forward 'foreign-regexp/search/ongoing-search-cmd-p t))
 
   (when (fboundp 'nonincremental-repeat-search-backward)
     (defadvice nonincremental-repeat-search-backward (around foreign-regexp/nonincremental-repeat-search-backward ())
@@ -3729,7 +3729,7 @@ to each search option changed hook."
        (t
         ad-do-it)))
     (foreign-regexp/ad-activate 'nonincremental-repeat-search-backward)
-    (put 'nonincremental-repeat-search-backward 'foreign-regexp/search/ongoing-search-cmd t)))
+    (put 'nonincremental-repeat-search-backward 'foreign-regexp/search/ongoing-search-cmd-p t)))
 
 ;; ----------------------------------------------------------------------------
 ;;
