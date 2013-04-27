@@ -413,7 +413,6 @@
 ;; write four external commands below with the language:
 ;; 
 ;;   `foreign-regexp/replace/external-command'
-;;   `foreign-regexp/occur/external-command'
 ;;   `foreign-regexp/search/external-command'
 ;;   `foreign-regexp/quote-meta/external-command'
 ;;
@@ -1971,74 +1970,6 @@ foreign-regexp/replace/replacement."
 ;;;
 ;;; ===========================================================================
 
-;; XXX: `A dot matches newline flag' should be removed?
-;;      (Is that flag nonsense thing? ...because `occur' is line
-;;       oriented matching operation...)
-(defvar foreign-regexp/occur/external-command nil
-  "Path of an external command to use to execute actual search
-operation.
-
-Six arguments describe below will be passed to the command.
-
- 1st: Path of a file which contains the text to be searched.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 2nd: Path of a file to which the command should write the result
-      of current search operation.
-
-      The external command have to output a form like:
-
-        (setq result
-              '(
-                ;; Match positions in 1st line
-                ((1st-MATCH-START 1st-MATCH-END)
-                 (2nd-MATCH-START 2nd-MATCH-END)
-                 ...)
-                ;; When a line has no match, do not put anything.
-                ...
-                ;; Match positions in n-th line
-                ((x-th-MATCH-START x-th-MATCH-END)
-                 (y-th-MATCH-START y-th-MATCH-END)
-                 ...)))
-
-      to this file.
-
-      Note that each start and end position in the form should be
-      an offset from beginning of the text which has been searched.
-      (This means each number should be started from 0, not from 1)
-
-      The text in this file must be encoded in the value of
-      `foreign-regexp/input-coding-system'.
-
- 3rd: Path of a file in which the regexp we want to search is written.
-      The command have a responsibility to search this regexp
-      from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 4th: A dot matches newline flag.
-      When the value of this flag is not empty string,
-      . should be matched to a newline character.
-
- 5th: A case sensitive flag.
-      When the value of this flag is not empty string,
-      the match operation should be done case-sensitive.
-
- 6th: An extended regular expression flag.
-      When the value of this flag is not empty string,
-      the current search regexp (see 3rd arg) should be
-      interpreted as extended regular expression.")
-
-(defvar foreign-regexp/occur/shell-script nil
-  "A shell script which will be run as
-`foreign-regexp/occur/external-command'
-when it has nil value.")
-
-
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Commands
@@ -2062,7 +1993,9 @@ when it has nil value.")
     (setf (symbol-function 'occur-engine)
           (symbol-function 'foreign-regexp/occur/occur-engine))
     (unwind-protect
-        (occur regexp nlines)
+        (foreign-regexp/search/with-regarding-string-as-foreign-regexp
+            (regexp)
+          (occur regexp nlines))
       (setf (symbol-function 'occur-engine)
             orig-occur-engine-fn))))
 
@@ -2074,20 +2007,9 @@ when it has nil value.")
 ;; ----------------------------------------------------------------------------
 
 ;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/occur/available-p) => BOOL
-;; ----------------------------------------------------------------------------
-(defun foreign-regexp/occur/available-p ()
-  "Test if external command or shell script is defined or not."
-  (or foreign-regexp/occur/external-command
-      foreign-regexp/occur/shell-script))
-
-;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/occur/assert-available) => VOID or ERROR
 ;; ----------------------------------------------------------------------------
-(defun foreign-regexp/occur/assert-available ()
-  "Raise error when no external command or shell script is defined."
-  (or (foreign-regexp/occur/available-p)
-      (error "[foreign-regexp] No external command or shell script is defined for occur.")))
+(defalias 'foreign-regexp/occur/assert-available 'foreign-regexp/search/assert-available)
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/occur-read-primary-args) => LIST
@@ -2105,34 +2027,33 @@ when it has nil value.")
 ;;                                   case-fold-search title-face
 ;;                                   prefix-face match-face keep-props) => NUM
 ;; ----------------------------------------------------------------------------
-(defun foreign-regexp/occur/occur-engine (regexp buffers out-buf nlines
-                                                 case-fold-search title-face
-                                                 prefix-face match-face keep-props)
+
+(defun foreign-regexp/occur/occur-engine (regexp buffers out-buf nlines case-fold
+                                                 title-face prefix-face match-face keep-props)
   "Alternate function of original `occur-engine'."
-  ;; Based on `occur-engine'.
+  ;; Based on `occur-engine', GNU Emacs 24.3.1.
   (with-current-buffer out-buf
     (let ((globalcount 0)
-          (coding nil))
+          (coding nil)
+          (case-fold-search case-fold))
       ;; Map over all the buffers
       (dolist (buf buffers)
         (when (buffer-live-p buf)
-          (let ((matches 0)	;; count of matched lines
+          (let ((matches 0)     ;; count of matched lines
+                (lines 1)       ;; line count
+                (prev-after-lines nil)  ;; context lines of prev match
+                (prev-lines nil)        ;; line number of prev match endpt
+                (matchbeg 0)
+        (matchend nil)
+                (origpt nil)
+                (begpt nil)
+                (endpt nil)
+                (marker nil)
                 (curstring "")
+                (ret nil)
                 (inhibit-field-text-motion t)
-                (headerpt (with-current-buffer out-buf (point)))
-                (*search-result-alst* nil)
-                (matches-in-line nil)
-                result)
+                (headerpt (with-current-buffer out-buf (point))))
             (with-current-buffer buf
-              (setq result (foreign-regexp/run-external-command
-                            foreign-regexp/occur/external-command
-                            foreign-regexp/occur/shell-script
-                            (buffer-substring (point-min) (point-max))
-                            regexp
-                            nil
-                            (if foreign-regexp/dot-match-a-newline-p "DOT" "")
-                            (if case-fold-search "" "CASE")
-                            (if foreign-regexp/use-extended-regexp-p "EXT" "")))
               (or coding
                   ;; Set CODING only if the current buffer locally
                   ;; binds buffer-file-coding-system.
@@ -2140,38 +2061,32 @@ when it has nil value.")
                   (setq coding buffer-file-coding-system))
               (save-excursion
                 (goto-char (point-min)) ;; begin searching in the buffer
-                (while (setq matches-in-line (prog1 (car result)
-                                               (setq result (cdr result))))
-                  (let* ((pt-min   (point-min))
-                         (matchbeg (+ pt-min (caar matches-in-line))) ;; [Count + Offset => Count]
-                         (lines    (progn (goto-char matchbeg)
-                                          (line-number-at-pos)))
-                         (marker   (point-marker))
-                         (begpt    (progn (beginning-of-line)
-                                          (point)))
-                         (endpt    (progn (end-of-line)
-                                          (point)))
-                         match-pair)
+                (while (not (eobp))
+                  (setq origpt (point))
+                  (when (setq matchend (re-search-forward regexp nil t))
                     (setq matches (1+ matches)) ;; increment match count
-                    
-                    (if (and keep-props
-                             (if (boundp 'jit-lock-mode) jit-lock-mode)
-                             (text-property-not-all begpt endpt 'fontified t))
-                        (if (fboundp 'jit-lock-fontify-now)
-                            (jit-lock-fontify-now begpt endpt)))
-                    (if (and keep-props (not (eq occur-excluded-properties t)))
-                        (progn
-                          (setq curstring (buffer-substring begpt endpt))
-                          (remove-list-of-text-properties
-                           0 (length curstring) occur-excluded-properties curstring))
-                      (setq curstring (buffer-substring-no-properties begpt endpt)))
+                    (setq matchbeg (match-beginning 0))
+                    ;; Get beginning of first match line and end of the last.
+                    (save-excursion
+                      (goto-char matchbeg)
+                      (setq begpt (line-beginning-position))
+                      (goto-char matchend)
+                      (setq endpt (line-end-position)))
+                    ;; Sum line numbers up to the first match line.
+                    (save-excursion
+                      (goto-char matchbeg)
+                      (setq lines (+ lines (count-lines origpt (point))
+                                     (if (bolp) 1 0)
+                                     -1)))
+                    (setq marker (make-marker))
+                    (set-marker marker matchbeg)
+                    (setq curstring (occur-engine-line begpt endpt keep-props))
                     ;; Highlight the matches
-                    (while (setq match-pair (prog1 (car matches-in-line)
-                                              (setq matches-in-line
-                                                    (cdr matches-in-line))))
+                    (goto-char begpt)
+                    (while (re-search-forward regexp endpt t)
+                      (setq matchend (point))
                       (add-text-properties
-                       (- (+ pt-min (nth 0 match-pair)) begpt) ;; [Count + Offset => Count]
-                       (- (+ pt-min (nth 1 match-pair)) begpt) ;; [Count + Offset => Count]
+                       (- (match-beginning 0) begpt) (- (point) begpt)
                        (append
                         `(occur-match t)
                         (when match-face
@@ -2180,24 +2095,37 @@ when it has nil value.")
                           `(face ,match-face)))
                        curstring))
                     ;; Generate the string to insert for this match
-                    (let* ((out-line
+                    (let* ((match-prefix
+                            ;; Using 7 digits aligns tabs properly.
+                            (apply #'propertize (format "%7d:" lines)
+                                   (append
+                                    (when prefix-face
+                                      `(font-lock-face prefix-face))
+                                    `(occur-prefix t mouse-face (highlight)
+                                      ;; Allow insertion of text at
+                                      ;; the end of the prefix (for
+                                      ;; Occur Edit mode).
+                                      front-sticky t rear-nonsticky t
+                                      occur-target ,marker follow-link t
+                                      help-echo "mouse-2: go to this occurrence"))))
+                           (match-str
+                            ;; We don't put `mouse-face' on the newline,
+                            ;; because that loses.  And don't put it
+                            ;; on context lines to reduce flicker.
+                            (propertize curstring 'mouse-face (list 'highlight)
+                                        'occur-target marker
+                                        'follow-link t
+                                        'help-echo
+                                        "mouse-2: go to this occurrence"))
+                           (out-line
                             (concat
-                             ;; Using 7 digits aligns tabs properly.
-                             (apply #'propertize (format "%7d:" lines)
-                                    (append
-                                     (when prefix-face
-                                       `(font-lock-face prefix-face))
-                                     `(occur-prefix t mouse-face (highlight)
-                                                    occur-target ,marker follow-link t
-                                                    help-echo "mouse-2: go to this occurrence")))
-                             ;; We don't put `mouse-face' on the newline,
-                             ;; because that loses.  And don't put it
-                             ;; on context lines to reduce flicker.
-                             (propertize curstring 'mouse-face (list 'highlight)
-                                         'occur-target marker
-                                         'follow-link t
-                                         'help-echo
-                                         "mouse-2: go to this occurrence")
+                             match-prefix
+                             ;; Add non-numeric prefix to all non-first lines
+                             ;; of multi-line matches.
+                             (replace-regexp-in-string
+                              "\n"
+                              "\n       :"
+                              match-str)
                              ;; Add marker at eol, but no mouse props.
                              (propertize "\n" 'occur-target marker)))
                            (data
@@ -2205,23 +2133,44 @@ when it has nil value.")
                                 ;; The simple display style
                                 out-line
                               ;; The complex multi-line display style.
-                              (occur-context-lines out-line nlines keep-props)
-                              )))
+                              (setq ret (occur-context-lines
+                                         out-line nlines keep-props begpt endpt
+                                         lines prev-lines prev-after-lines))
+                              ;; Set first elem of the returned list to `data',
+                              ;; and the second elem to `prev-after-lines'.
+                              (setq prev-after-lines (nth 1 ret))
+                              (nth 0 ret))))
                       ;; Actually insert the match display data
                       (with-current-buffer out-buf
-                        (let ((beg (point))
-                              (end (progn (insert data) (point))))
-                          (unless (= nlines 0)
-                            (insert "-------\n")))))))))
+                        (insert data))))
+                  (if matchend
+                      (progn
+                        ;; Sum line numbers between first and last match lines.
+                        (setq lines (+ lines (count-lines begpt (point))
+                                       (if (bolp) 1 0)
+                                       -1)))
+                    (goto-char (point-max)))
+                  (setq prev-lines (1- lines)))
+                ;; Flush remaining context after-lines.
+                (when prev-after-lines
+                  (with-current-buffer out-buf
+                    (insert (apply #'concat (occur-engine-add-prefix
+                                             prev-after-lines)))))))
             (when (not (zerop matches)) ;; is the count zero?
               (setq globalcount (+ globalcount matches))
               (with-current-buffer out-buf
                 (goto-char headerpt)
                 (let ((beg (point))
                       end)
-                  (insert (format "%d match%s for \"%s\" in buffer: %s\n"
-                                  matches (if (= matches 1) "" "es")
-                                  regexp (buffer-name buf)))
+                  (insert (propertize
+                           (format "%d match%s%s in buffer: %s\n"
+                                   matches (if (= matches 1) "" "es")
+                                   ;; Don't display regexp for multi-buffer.
+                                   (if (> (length buffers) 1)
+                                       "" (format " for \"%s\""
+                                                  (query-replace-descr regexp)))
+                                   (buffer-name buf))
+                           'read-only t))
                   (setq end (point))
                   (add-text-properties beg end
                                        (append
@@ -2229,6 +2178,18 @@ when it has nil value.")
                                           `(font-lock-face ,title-face))
                                         `(occur-title ,buf))))
                 (goto-char (point-min)))))))
+      ;; Display total match count and regexp for multi-buffer.
+      (when (and (not (zerop globalcount)) (> (length buffers) 1))
+        (goto-char (point-min))
+        (let ((beg (point))
+              end)
+          (insert (format "%d match%s total for \"%s\":\n"
+                          globalcount (if (= globalcount 1) "" "es")
+                          (query-replace-descr regexp)))
+          (setq end (point))
+          (add-text-properties beg end (when title-face
+                                         `(font-lock-face ,title-face))))
+        (goto-char (point-min)))
       (if coding
           ;; CODING is buffer-file-coding-system of the first buffer
           ;; that locally binds it.  Let's use it also for the output
@@ -4186,11 +4147,9 @@ as the value of a tag."
 ;;                                       indicator-separator
 ;;                                       cmd-path-search
 ;;                                       cmd-path-replace
-;;                                       cmd-path-occur
 ;;                                       cmd-path-quote-meta
 ;;                                       script-search
 ;;                                       script-replace
-;;                                       script-occur
 ;;                                       script-quote-meta
 ;;                                       wsp-regexp-for-align) => VOID
 ;; ----------------------------------------------------------------------------
@@ -4207,12 +4166,10 @@ as the value of a tag."
                                                 indicator-separator
                                                 script-search
                                                 script-replace
-                                                script-occur
                                                 script-quote-meta
                                                 wsp-regexp-for-align
                                                 cmd-path-search
                                                 cmd-path-replace
-                                                cmd-path-occur
                                                 cmd-path-quote-meta)
   ;; FIXME: Write document.
   "Define a Foreign Regexp Type.
@@ -4260,9 +4217,6 @@ Arguments are:
   CMD-PATH-REPLACE:
         See `foreign-regexp/replace/external-command'.
 
-  CMD-PATH-OCCUR:
-        See `foreign-regexp/occur/external-command'.
-
   CMD-PATH-QUOTE-META:
         See `foreign-regexp/quote-meta/external-command'.
 
@@ -4272,9 +4226,6 @@ Arguments are:
   SCRIPT-REPLACE:
         See `foreign-regexp/replace/shell-script'.
 
-  SCRIPT-OCCUR:
-        See `foreign-regexp/occur/shell-script'.
-      
   SCRIPT-QUOTE-META:
         See `foreign-regexp/quote-meta/shell-script'.
 
@@ -4301,9 +4252,6 @@ Arguments are:
   (or script-replace
       cmd-path-replace
       (error "[foreign-regexp] No `:script-replace' or `:cmd-path-replace'!"))
-  (or script-occur
-      cmd-path-occur
-      (error "[foreign-regexp] No `:script-occur' or `:cmd-path-occur'!"))
   (or script-quote-meta
       cmd-path-quote-meta
       (error "[foreign-regexp] No `:script-quote-meta' or `:cmd-path-quote-meta'!"))
@@ -4323,11 +4271,9 @@ Arguments are:
               :indicator-separator      indicator-separator
               :script-search            script-search
               :script-replace           script-replace
-              :script-occur             script-occur
               :script-quote-meta        script-quote-meta
               :cmd-path-search          cmd-path-search
               :cmd-path-replace         cmd-path-replace
-              :cmd-path-occur           cmd-path-occur
               :cmd-path-quote-meta      cmd-path-quote-meta
               :wsp-regexp-for-align     wsp-regexp-for-align)
         foreign-regexp/regexp-type/.type-alst)
@@ -4383,8 +4329,6 @@ Arguments are:
     (setq foreign-regexp/search/shell-script                       (cadr (memq :script-search          kv-lst)))
     (setq foreign-regexp/replace/external-command                  (cadr (memq :cmd-path-replace       kv-lst)))
     (setq foreign-regexp/replace/shell-script                      (cadr (memq :script-replace         kv-lst)))
-    (setq foreign-regexp/occur/external-command                    (cadr (memq :cmd-path-occur         kv-lst)))
-    (setq foreign-regexp/occur/shell-script                        (cadr (memq :script-occur           kv-lst)))
     (setq foreign-regexp/quote-meta/external-command               (cadr (memq :cmd-path-quote-meta    kv-lst)))
     (setq foreign-regexp/quote-meta/shell-script                   (cadr (memq :script-quote-meta      kv-lst)))
     (setq foreign-regexp/align/wsp-regexp                          (cadr (memq :wsp-regexp-for-align   kv-lst)))
@@ -4432,138 +4376,6 @@ will be used to customize user option `foreign-regexp/regexp-type'."
 ;;;  Predefined Shell Scripts.
 ;;;
 ;;; ===========================================================================
-
-(defvar foreign-regexp/shell-script/foreign-regexp-occur-aux.pl "#!/usr/bin/env perl
-use strict;
-use warnings;
-use 5.008;
-
-use Encode;
-use utf8;
-
-use English qw( -no_match_vars );
-use FileHandle;
-
-sub main () {
-    my $fn_in     = shift @ARGV or die \"No input  file name!\";
-    my $fn_out    = shift @ARGV or die \"No output file name!\";
-    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
-    my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
-    my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
-    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";;
-    my $code      = 'utf8';
-    my $offset    = 0;
-    
-    umask 0177;
-    
-    my($str_in, $str_pat, $str_repl);
-    use PerlIO::encoding;
-    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
-    {
-        local $INPUT_RECORD_SEPARATOR = undef;
-        $str_pat  = FileHandle->new($fn_pat, \"<:encoding($code)\")->getline;
-    }
-    
-    my $pat = eval(\"qr/\\${str_pat}/om\" .
-                   ( $dot_p  ? \"s\" : \"\") .
-                   (!$case_p ? \"i\" : \"\") .
-                   ( $ext_p  ? \"x\" : \"\"));
-    die $EVAL_ERROR if $EVAL_ERROR;
-    
-    {
-        local $INPUT_RECORD_SEPARATOR = \"\\n\";
-        my $fh_in  = FileHandle->new($fn_in, \"<:encoding($code)\");
-        my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
-        
-        print $fh_out \"(setq result '(\\n\";
-        
-        while (my $line = <$fh_in>) {
-            my $len     = length $line;
-            my $matched = 0;
-            chomp $line;
-            
-            
-            while ($line =~ m/${pat}/g) {
-                print $fh_out '(' unless $matched++;
-                print($fh_out
-                      '(',
-                      $offset + $LAST_MATCH_START[0], ' ',
-                      $offset + $LAST_MATCH_END  [0],
-                      ')');
-            }
-            
-            print $fh_out ')' if $matched;
-                
-            $offset += $len;
-        }
-        
-        print $fh_out \"))\\n\";
-        print $fh_out \";;; EOF\\n\";
-    }
-    
-    exit 0;
-}
-
-main();
-
-# EOF
-
-")
-
-(defvar foreign-regexp/shell-script/foreign-regexp-occur-aux.rb "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p = ARGV
-  
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  offset = 0
-  
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  open(fn_in, 'r:UTF-8') do |file_in|
-    while line = file_in.gets do
-      matched = 0
-      len = line.length
-      line.chomp!
-      
-      line.scan( pat ) do
-        print '(' if matched == 0
-        print '('
-        print offset + Regexp.last_match.begin(0), ' '
-        print offset + Regexp.last_match.end(0)
-        print ')'
-        matched += 1
-      end
-      print ')' if matched != 0
-      
-      offset += len
-    end
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-  
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-
-")
 
 (defvar foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.pl "#!/usr/bin/env perl
 use strict;
@@ -4945,7 +4757,6 @@ main
  :output-coding-system   'utf-8-unix
  :script-search          foreign-regexp/shell-script/foreign-regexp-search-aux.pl
  :script-replace         foreign-regexp/shell-script/foreign-regexp-replace-aux.pl
- :script-occur           foreign-regexp/shell-script/foreign-regexp-occur-aux.pl
  :script-quote-meta      foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.pl
  :wsp-regexp-for-align    "([ \\t]+)"
  :indicator-case-fold     "i"
@@ -4963,7 +4774,6 @@ main
  :output-coding-system   'utf-8-unix
  :script-search          foreign-regexp/shell-script/foreign-regexp-search-aux.rb
  :script-replace         foreign-regexp/shell-script/foreign-regexp-replace-aux.rb
- :script-occur           foreign-regexp/shell-script/foreign-regexp-occur-aux.rb
  :script-quote-meta      foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.rb
  :wsp-regexp-for-align    "([ \\t]+)"
  :indicator-case-fold     "i"
