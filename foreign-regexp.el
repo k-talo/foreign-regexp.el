@@ -465,15 +465,16 @@
 ;;;
 ;;; ===========================================================================
 
-(eval-when-compile
+(eval-and-compile
   (defvar foreign-regexp/search/debug-cache nil)
   (defvar foreign-regexp/transition/debug-advices nil))
 
-;; ----------------------------------------------------------------------------
-;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
+
+;;; ===========================================================================
+;;;
+;;;  Macros
+;;;
+;;; ===========================================================================
 
 (defmacro foreign-regexp/.debug (class &rest args)
   "Display debugging message when CLASS has non-nil value."
@@ -496,6 +497,168 @@
                  (format-time-string "[DEBUG %p%H:%M:%S] " (current-time))
                  (quote ,args)
                  c)))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/alambda parms &body body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro* foreign-regexp/alambda (parms &body body)
+  "An utility macro.
+This macro allows anonymous functions to refer themselves
+through a symbol `self'."
+  (declare (indent 1))
+  `(labels ((self ,parms ,@body))
+     #'self))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/catch-case var bodyform &rest handlers) => RESULT OF BODYFORM
+;;                                                           OR HANDLERS
+;; ----------------------------------------------------------------------------
+(defmacro foreign-regexp/catch-case (var bodyform &rest handlers)
+  "Regain control when a tag is thrown.
+Executes BODYFORM and returns its value if no tag is thrown.
+Each element of HANDLERS looks like (TAG-NAME BODY...)
+where the BODY is made of Lisp expressions.
+
+A handler is applicable to an tag if TAG-NAME is one of
+the tag names.
+If an tag is thrown, the first applicable handler is run.
+
+The car of a handler may be a list of tag names
+instead of a single tag name.  Then it handles all of them.
+
+When a handler handles an error, control returns to the
+`foreign-regexp/catch-case' and it executes the handler's
+BODY... with VAR bound to (TAG-NAME . THROWNED-VALUE).
+Then the value of the last BODY form is returned from the
+`foreign-regexp/catch-case' expression.
+
+See also the function `throw' for more info."
+  (declare (indent 2))
+  (let* ((g-retval (gensym))
+         (bodyform (list 'setq g-retval bodyform))
+         var-lst
+         clause-lst)
+    (dolist (h handlers)
+      (let* ((tag-lst
+              (cond
+               ((listp (car h)) (car h))
+               (t (list (car h)))))
+             (var-tag-val (gensym)))
+        (dolist (tag tag-lst)
+          (push (list var-tag-val `(quote ,var-tag-val)) var-lst)
+          (setq bodyform
+                `(setq ,var-tag-val (catch (quote ,tag)
+                                      ,bodyform
+                                      ,var-tag-val)))
+          (push `((not (eq ,var-tag-val (quote ,var-tag-val)))
+                  (let ((,var (cons (quote ,tag) ,var-tag-val))) ,@(cdr h)))
+                clause-lst))))
+    `(let (,g-retval ,@var-lst)
+       ,bodyform
+       (cond
+        ,@clause-lst
+        (t ,g-retval)))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/read-from-minibuf/with-search-option-indicator &rest body)
+;;                                                       => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro foreign-regexp/read-from-minibuf/with-search-option-indicator (&rest body)
+  "Run body with search option indicator on prompt of `read-from-minibuffer'. "
+  `(unwind-protect
+       (progn
+         (foreign-regexp/ad-enable 'read-from-minibuffer 'around 'foreign-regexp/read-from-minibuf/with-search-option-indicator)
+         (foreign-regexp/ad-activate 'read-from-minibuffer)
+         ,@body)
+     (foreign-regexp/ad-disable 'read-from-minibuffer 'around 'foreign-regexp/read-from-minibuf/with-search-option-indicator)
+     (foreign-regexp/ad-activate 'read-from-minibuffer)))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/read-from-minibuf/with-initial-contents
+;;                          initial-contents &rest body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro foreign-regexp/read-from-minibuf/with-initial-contents (initial-contents &rest body)
+  "Run body with setting initial contents to `read-from-minibuffer'."
+  (declare (indent 1))
+  ;; Set initial contents for `read-from-minibuffer'.
+  `(unwind-protect
+       (progn
+         (foreign-regexp/ad-enable 'read-from-minibuffer 'before 'foreign-regexp/read-from-minibuf/with-initial-contents)
+         (foreign-regexp/ad-activate 'read-from-minibuffer)
+         (let ((foreign-regexp/.initial-contents ,initial-contents))
+           ,@body))
+     (foreign-regexp/ad-disable 'read-from-minibuffer 'before 'foreign-regexp/read-from-minibuf/with-initial-contents)
+     (foreign-regexp/ad-activate 'read-from-minibuffer)))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/search/with-regarding-these-string-as-foreign-regexp
+;;             (string-list &optional limit) &rest body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro foreign-regexp/search/with-regarding-these-string-as-foreign-regexp (args &rest body)
+  "Run BODY with applying `foreign-regexp/search/forward' and
+`foreign-regexp/search/backward' to member of STRING-LIST in
+substitution for `re-search-forward' and `re-search-backward'.
+
+Note that the equivalence of the STRING are tested in `eq'.
+
+When LIMIT is a number, match will be limited to the LIMIT.
+When LIMIT is NIL, match won't be limited.
+
+\(FN (STRING-LIST &OPTIONAL LIMIT) &REST BODY)"
+  (declare (indent 1))
+  (let ((g-orig-re-fwd-fn  (gensym))
+        (g-orig-re-bkwd-fn (gensym))
+        (g-regexp-lst      (gensym))
+        (g-limit           (gensym))
+        (g-args            (gensym)))
+    `(lexical-let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
+                   (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
+       (unwind-protect
+           (lexical-let ((,g-regexp-lst ,(nth 0 args))
+                         (,g-limit      ,(nth 1 args)))
+             (setf (symbol-function 're-search-forward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((memq regexp ,g-regexp-lst)
+                       (funcall 'foreign-regexp/search/forward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-fwd-fn 
+                                regexp bound noerror count)))))
+             (setf (symbol-function 're-search-backward)
+                   (lambda (regexp &optional bound noerror count)
+                     (cond
+                      ((memq regexp ,g-regexp-lst)
+                       (funcall 'foreign-regexp/search/backward
+                                regexp bound noerror count ,g-limit))
+                      (t
+                       (funcall ,g-orig-re-bkwd-fn
+                                regexp bound noerror count)))))
+             ,@body)
+         (setf (symbol-function 're-search-forward)  ,g-orig-re-fwd-fn)
+         (setf (symbol-function 're-search-backward) ,g-orig-re-bkwd-fn)))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/search/with-regarding-string-as-foreign-regexp
+;;                  (string &optional limit) &rest body) => RESULT OF BODYFORM
+;; ----------------------------------------------------------------------------
+(defmacro foreign-regexp/search/with-regarding-string-as-foreign-regexp (args &rest body)
+  "Run BODY with applying `foreign-regexp/search/forward' and
+`foreign-regexp/search/backward' to STRING in substitution for
+`re-search-forward' and `re-search-backward'.
+
+Note that the equivalence of the STRING are tested in `eq'.
+
+When LIMIT is a number, match will be limited to the LIMIT.
+When LIMIT is NIL, match won't be limited.
+
+\(FN (STRING &OPTIONAL LIMIT) &REST BODY)"
+  (declare (indent 1))
+  `(foreign-regexp/search/with-regarding-these-string-as-foreign-regexp
+    ((list ,(nth 0 args))
+     ,(nth 1 args))
+    ,@body))
+
 
 
 ;;; ===========================================================================
@@ -560,74 +723,6 @@ should use extended regexp.")
 
 (defvar foreign-regexp/dot-match-changed-hook nil
   "Normal hook run after toggle `foreign-regexp/dot-match-a-newline-p'.")
-
-
-;; ----------------------------------------------------------------------------
-;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/alambda parms &body body) => RESULT OF BODYFORM
-;; ----------------------------------------------------------------------------
-(defmacro* foreign-regexp/alambda (parms &body body)
-  "An utility macro.
-This macro allows anonymous functions to refer themselves
-through a symbol `self'."
-  (declare (indent 1))
-  `(labels ((self ,parms ,@body))
-     #'self))
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/catch-case var bodyform &rest handlers) => RESULT OF BODYFORM
-;;                                                           OR HANDLERS
-;; ----------------------------------------------------------------------------
-(defmacro foreign-regexp/catch-case (var bodyform &rest handlers)
-  "Regain control when a tag is thrown.
-Executes BODYFORM and returns its value if no tag is thrown.
-Each element of HANDLERS looks like (TAG-NAME BODY...)
-where the BODY is made of Lisp expressions.
-
-A handler is applicable to an tag if TAG-NAME is one of
-the tag names.
-If an tag is thrown, the first applicable handler is run.
-
-The car of a handler may be a list of tag names
-instead of a single tag name.  Then it handles all of them.
-
-When a handler handles an error, control returns to the
-`foreign-regexp/catch-case' and it executes the handler's
-BODY... with VAR bound to (TAG-NAME . THROWNED-VALUE).
-Then the value of the last BODY form is returned from the
-`foreign-regexp/catch-case' expression.
-
-See also the function `throw' for more info."
-  (declare (indent 2))
-  (let* ((g-retval (gensym))
-         (bodyform (list 'setq g-retval bodyform))
-         var-lst
-         clause-lst)
-    (dolist (h handlers)
-      (let* ((tag-lst
-              (cond
-               ((listp (car h)) (car h))
-               (t (list (car h)))))
-             (var-tag-val (gensym)))
-        (dolist (tag tag-lst)
-          (push (list var-tag-val `(quote ,var-tag-val)) var-lst)
-          (setq bodyform
-                `(setq ,var-tag-val (catch (quote ,tag)
-                                      ,bodyform
-                                      ,var-tag-val)))
-          (push `((not (eq ,var-tag-val (quote ,var-tag-val)))
-                  (let ((,var (cons (quote ,tag) ,var-tag-val))) ,@(cdr h)))
-                clause-lst))))
-    `(let (,g-retval ,@var-lst)
-       ,bodyform
-       (cond
-        ,@clause-lst
-        (t ,g-retval)))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -955,45 +1050,6 @@ This is a side effect free version of `ad-activate'."
 ;;;  Patches for `read-from-minibuffer'.
 ;;;
 ;;; ===========================================================================
-
-;; ----------------------------------------------------------------------------
-;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/read-from-minibuf/with-search-option-indicator &rest body)
-;;                                                       => RESULT OF BODYFORM
-;; ----------------------------------------------------------------------------
-(defmacro foreign-regexp/read-from-minibuf/with-search-option-indicator (&rest body)
-  "Run body with search option indicator on prompt of `read-from-minibuffer'. "
-  `(unwind-protect
-       (progn
-         (foreign-regexp/ad-enable 'read-from-minibuffer 'around 'foreign-regexp/read-from-minibuf/with-search-option-indicator)
-         (foreign-regexp/ad-activate 'read-from-minibuffer)
-         ,@body)
-     (foreign-regexp/ad-disable 'read-from-minibuffer 'around 'foreign-regexp/read-from-minibuf/with-search-option-indicator)
-     (foreign-regexp/ad-activate 'read-from-minibuffer)))
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/read-from-minibuf/with-initial-contents
-;;                          initial-contents &rest body) => RESULT OF BODYFORM
-;; ----------------------------------------------------------------------------
-(defmacro foreign-regexp/read-from-minibuf/with-initial-contents (initial-contents &rest body)
-  "Run body with setting initial contents to `read-from-minibuffer'."
-  (declare (indent 1))
-  ;; Set initial contents for `read-from-minibuffer'.
-  `(unwind-protect
-       (progn
-         (foreign-regexp/ad-enable 'read-from-minibuffer 'before 'foreign-regexp/read-from-minibuf/with-initial-contents)
-         (foreign-regexp/ad-activate 'read-from-minibuffer)
-         (let ((foreign-regexp/.initial-contents ,initial-contents))
-           ,@body))
-     (foreign-regexp/ad-disable 'read-from-minibuffer 'before 'foreign-regexp/read-from-minibuf/with-initial-contents)
-     (foreign-regexp/ad-activate 'read-from-minibuffer)))
-
-
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -2201,8 +2257,7 @@ foreign-regexp/replace/replacement."
 
 ;;; ===========================================================================
 ;;;
-;;;  `search-forward' and `search-backward' for foreign regexp
-;;;                                         with a help from external command.
+;;;  `search-forward' and `search-backward' by foreign regexp.
 ;;;
 ;;; ===========================================================================
 
@@ -2270,81 +2325,6 @@ Seven arguments describe below will be passed to the command.
 `foreign-regexp/search/external-command'
 when it has nil value.")
 
-
-;; ----------------------------------------------------------------------------
-;;
-;;  Macros
-;;
-;; ----------------------------------------------------------------------------
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/search/with-regarding-these-string-as-foreign-regexp
-;;             (string-list &optional limit) &rest body) => RESULT OF BODYFORM
-;; ----------------------------------------------------------------------------
-(defmacro foreign-regexp/search/with-regarding-these-string-as-foreign-regexp (args &rest body)
-  "Run BODY with applying `foreign-regexp/search/forward' and
-`foreign-regexp/search/backward' to member of STRING-LIST in
-substitution for `re-search-forward' and `re-search-backward'.
-
-Note that the equivalence of the STRING are tested in `eq'.
-
-When LIMIT is a number, match will be limited to the LIMIT.
-When LIMIT is NIL, match won't be limited.
-
-\(FN (STRING-LIST &OPTIONAL LIMIT) &REST BODY)"
-  (declare (indent 1))
-  (let ((g-orig-re-fwd-fn  (gensym))
-        (g-orig-re-bkwd-fn (gensym))
-        (g-regexp-lst      (gensym))
-        (g-limit           (gensym))
-        (g-args            (gensym)))
-    `(lexical-let ((,g-orig-re-fwd-fn  (symbol-function 're-search-forward))
-                   (,g-orig-re-bkwd-fn (symbol-function 're-search-backward)))
-       (unwind-protect
-           (lexical-let ((,g-regexp-lst ,(nth 0 args))
-                         (,g-limit      ,(nth 1 args)))
-             (setf (symbol-function 're-search-forward)
-                   (lambda (regexp &optional bound noerror count)
-                     (cond
-                      ((memq regexp ,g-regexp-lst)
-                       (funcall 'foreign-regexp/search/forward
-                                regexp bound noerror count ,g-limit))
-                      (t
-                       (funcall ,g-orig-re-fwd-fn 
-                                regexp bound noerror count)))))
-             (setf (symbol-function 're-search-backward)
-                   (lambda (regexp &optional bound noerror count)
-                     (cond
-                      ((memq regexp ,g-regexp-lst)
-                       (funcall 'foreign-regexp/search/backward
-                                regexp bound noerror count ,g-limit))
-                      (t
-                       (funcall ,g-orig-re-bkwd-fn
-                                regexp bound noerror count)))))
-             ,@body)
-         (setf (symbol-function 're-search-forward)  ,g-orig-re-fwd-fn)
-         (setf (symbol-function 're-search-backward) ,g-orig-re-bkwd-fn)))))
-
-;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/search/with-regarding-string-as-foreign-regexp
-;;                  (string &optional limit) &rest body) => RESULT OF BODYFORM
-;; ----------------------------------------------------------------------------
-(defmacro foreign-regexp/search/with-regarding-string-as-foreign-regexp (args &rest body)
-  "Run BODY with applying `foreign-regexp/search/forward' and
-`foreign-regexp/search/backward' to STRING in substitution for
-`re-search-forward' and `re-search-backward'.
-
-Note that the equivalence of the STRING are tested in `eq'.
-
-When LIMIT is a number, match will be limited to the LIMIT.
-When LIMIT is NIL, match won't be limited.
-
-\(FN (STRING &OPTIONAL LIMIT) &REST BODY)"
-  (declare (indent 1))
-  `(foreign-regexp/search/with-regarding-these-string-as-foreign-regexp
-    ((list ,(nth 0 args))
-     ,(nth 1 args))
-    ,@body))
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -3759,7 +3739,7 @@ to each search option changed hook."
 
 ;; ----------------------------------------------------------------------------
 ;;
-;;  Macros
+;;  Private Macros
 ;;
 ;; ----------------------------------------------------------------------------
 
