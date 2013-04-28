@@ -727,6 +727,40 @@ should use extended regexp.")
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/case-fold-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/case-fold-available-p ()
+  "Test if the search option `Case Insensitive Search' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/case-fold-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-case-fold-str))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/ext-regexp-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/ext-regexp-available-p ()
+  "Test if the search option `Extended Regular Expression' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/ext-regexp-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-ext-regexp-str))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/case-fold-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/dot-match-available-p ()
+  "Test if the search option `. Matches a Newline' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/dot-match-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-dot-match-str))))
+
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
@@ -737,6 +771,9 @@ should use extended regexp.")
 (defun foreign-regexp/toggle-case-fold (&optional no-message)
   "Toggle `case-fold-search'."
   (interactive)
+  
+  (when (not (foreign-regexp/case-fold-available-p))
+    (error "[foreign-regexp] Search option `Case Insensitive' is not supported by current foreign regexp."))
   
   (run-hooks 'foreign-regexp/case-fold-will-change-hook)
   (cond
@@ -760,6 +797,10 @@ should use extended regexp.")
 (defun foreign-regexp/toggle-dot-match (&optional no-message)
   "Toggle `foreign-regexp/dot-match-a-newline-p'."
   (interactive)
+  
+  (when (not (foreign-regexp/dot-match-available-p))
+    (error "[foreign-regexp] Search option `. Matches a Newline' is not supported by current foreign regexp."))
+  
   (run-hooks 'foreign-regexp/dot-match-will-change-hook)
   (setq foreign-regexp/dot-match-a-newline-p
         (not foreign-regexp/dot-match-a-newline-p))
@@ -776,6 +817,10 @@ should use extended regexp.")
 (defun foreign-regexp/toggle-ext-regexp (&optional no-message)
   "Toggle `foreign-regexp/use-extended-regexp-p'."
   (interactive)
+  
+  (when (not (foreign-regexp/ext-regexp-available-p))
+    (error "[foreign-regexp] Search option `Extended Regular Expression' is not supported by current foreign regexp."))
+  
   (run-hooks 'foreign-regexp/ext-regexp-will-change-hook)
   (setq foreign-regexp/use-extended-regexp-p
         (not foreign-regexp/use-extended-regexp-p))
@@ -972,27 +1017,45 @@ This is a side effect free version of `ad-activate'."
 
 (defvar foreign-regexp/search-option-indicator/case-fold-str ""
   "A string displayed when the search option
-`case-fold-search' is on.")
+`case-fold-search' is on.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/no-case-fold-str "Case"
   "A string displayed when the search option
-`case-fold-search' is off.")
+`case-fold-search' is off.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/dot-match-str ".=~\\n"
   "A string displayed when the search option
-`foreign-regexp/dot-match-a-newline-p' is on.")
+`foreign-regexp/dot-match-a-newline-p' is on.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/no-dot-match-str ""
   "A string displayed when the search option
-`foreign-regexp/dot-match-a-newline-p' is off.")
+`foreign-regexp/dot-match-a-newline-p' is off.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/ext-regexp-str "Ext"
   "A string displayed when the search option
-`foreign-regexp/use-extended-regexp-p' is on.")
+`foreign-regexp/use-extended-regexp-p' is on.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/no-ext-regexp-str ""
   "A string displayed when the search option
-`foreign-regexp/use-extended-regexp-p' is off.")
+`foreign-regexp/use-extended-regexp-p' is off.
+
+Set empty string to this variable when the foreign
+regexp does not support this search option.")
 
 (defvar foreign-regexp/search-option-indicator/separator-str " "
   "A string displayed between search option strings.")
@@ -1229,13 +1292,22 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
                                    (foreign-regexp/menu/regexp-type-menu-gen)))
                         ("--")
                         ["Case Insensitive" foreign-regexp/toggle-case-fold
-                         :style radio :selected (if isearch-mode
-                                                    isearch-case-fold-search
-                                                  case-fold-search)]
+                         :style    radio
+                         :selected (and (foreign-regexp/case-fold-available-p)
+                                        (if isearch-mode
+                                            (insert )search-case-fold-search
+                                            case-fold-search))
+                         :active   (foreign-regexp/case-fold-available-p)]
                         [". Matches a Newline" foreign-regexp/toggle-dot-match
-                         :style radio :selected foreign-regexp/dot-match-a-newline-p]
+                         :style    radio
+                         :selected (and (foreign-regexp/dot-match-available-p)
+                                        foreign-regexp/dot-match-a-newline-p)
+                         :active   (foreign-regexp/dot-match-available-p)]
                         ["Extended Regular Expression" foreign-regexp/toggle-ext-regexp
-                         :style radio :selected foreign-regexp/use-extended-regexp-p])
+                         :style    radio
+                         :selected (and (foreign-regexp/ext-regexp-available-p)
+                                        foreign-regexp/use-extended-regexp-p)
+                         :active   (foreign-regexp/ext-regexp-available-p)])
                       "goto")
 
   ;; XXX: Should be removed?
