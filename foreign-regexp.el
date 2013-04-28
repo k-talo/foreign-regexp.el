@@ -4259,6 +4259,10 @@ Arguments are:
               :wsp-regexp-for-align     wsp-regexp-for-align)
         foreign-regexp/regexp-type/.type-alst)
 
+  ;; When regex type is redefined, reload it.
+  (when (eq foreign-regexp/regexp-type name)
+    (foreign-regexp/regexp-type/set name))
+  
   (foreign-regexp/regexp-type/custom-widget/regexp-type-selector/update))
 
 ;; ----------------------------------------------------------------------------
