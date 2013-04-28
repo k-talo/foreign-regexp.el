@@ -452,7 +452,7 @@
 (defconst foreign-regexp/version "0.0")
 
 
-(eval-when-compile
+(eval-and-compile
   (require 'cl)
   (require 'menu-bar)
   (require 'easymenu))
@@ -710,8 +710,8 @@ This is workaround for this behavior."
 		nil buffer nil "-c"
 		(apply #'concat
 		       (shell-quote-argument program) " "
-		       (mapcar '(lambda (arg)
-				  (concat (shell-quote-argument arg) " "))
+		       (mapcar #'(lambda (arg)
+                           (concat (shell-quote-argument arg) " "))
 			       args))))
 
 (defun foreign-regexp/run-external-command (cmd-path shell-script
@@ -1622,18 +1622,18 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
     (push-mark)
     (undo-boundary)
     (unwind-protect
-        (flet ((update-real-match-data (idx)
-                                       (setq real-match-data
-                                             (let ((ov (foreign-regexp/replace/ovs-on-match/get-nth idx)))
-                                               (when ov
-                                                 (list (overlay-start ov)
-                                                       (overlay-end   ov)))))
-                                       (set-match-data real-match-data)
-                                       real-match-data)
-               (update-next-replacement (idx)
-                                        (setq next-replacement
-                                              (overlay-get (foreign-regexp/replace/ovs-on-match/get-nth idx)
-                                                           'foreign-regexp/replace/replacement))))
+        (cl-flet ((update-real-match-data (idx)
+                                          (setq real-match-data
+                                                (let ((ov (foreign-regexp/replace/ovs-on-match/get-nth idx)))
+                                                  (when ov
+                                                    (list (overlay-start ov)
+                                                          (overlay-end   ov)))))
+                                          (set-match-data real-match-data)
+                                          real-match-data)
+                  (update-next-replacement (idx)
+                                           (setq next-replacement
+                                                 (overlay-get (foreign-regexp/replace/ovs-on-match/get-nth idx)
+                                                              'foreign-regexp/replace/replacement))))
           ;; Loop finding occurrences that perhaps should be replaced.
           (while (and idx
                       keep-going
@@ -2909,8 +2909,9 @@ See also `align-regexp'."
                        (cons 'column (abs spacing)))
                      (cons 'repeat repeat)))))
     
-    (foreign-regexp/search/with-regarding-string-as-foreign-regexp (regexp)
-                                                                   (align-region beg end 'entire rule nil nil))))
+    (foreign-regexp/search/with-regarding-string-as-foreign-regexp
+        (regexp)
+      (align-region beg end 'entire rule nil nil))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -3481,22 +3482,22 @@ When the current buffer is not *RE-Builder*, returns nil."
   ;;      structure other than default value.
   (let ((type (get 'reb-re-syntax 'custom-type)))
     (setq type (delete 'choice type))
-    (mapcar '(lambda (alt-type)
-               (cond
-                ((symbolp alt-type)
-                 alt-type)
-                ((listp alt-type)
-                 (let (retval)
-                   (while alt-type
-                     (case (car alt-type)
-                       ((const)
-                        (setq alt-type (cdr alt-type)))
-                       ((:tag)
-                        (setq alt-type (cddr alt-type)))
-                       (t
-                        (setq retval (car alt-type))
-                        (setq alt-type nil))))
-                   retval))))
+    (mapcar #'(lambda (alt-type)
+                (cond
+                 ((symbolp alt-type)
+                  alt-type)
+                 ((listp alt-type)
+                  (let (retval)
+                    (while alt-type
+                      (case (car alt-type)
+                        ((const)
+                         (setq alt-type (cdr alt-type)))
+                        ((:tag)
+                         (setq alt-type (cddr alt-type)))
+                        (t
+                         (setq retval (car alt-type))
+                         (setq alt-type nil))))
+                    retval))))
             type)))
 
 ;; ----------------------------------------------------------------------------
@@ -4783,5 +4784,9 @@ main
  :indicator-dot-match     "m"
  :indicator-no-dot-match  "-"
  :indicator-separator     "")
+
+;; Local variables:
+;; byte-compile-warnings: (not cl-functions)
+;; End:
 
 ;;; foreign-regexp.el ends here
