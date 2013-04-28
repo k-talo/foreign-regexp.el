@@ -1,6 +1,6 @@
 ;;; foreign-regexp.el --- search and replace by foreign regexp.
 
-;; Copyright (C) 2010-2012 K-talo Miyazaki, all rights reserved.
+;; Copyright (C) 2010-2013 K-talo Miyazaki, all rights reserved.
 
 ;; Author: K-talo Miyazaki <Keitaro dot Miyazaki at gmail dot com>
 ;; Created: Sun Nov 28 23:50:45 2010 JST
@@ -27,8 +27,8 @@
 
 ;;; NOTE
 ;;
-;; This library is just tested on Emacs 23.2.1 on Ubuntu 10.04
-;; and Mac OS X 10.6.3, and won't be run with any version of XEmacs.
+;; This library is just tested on Emacs 24.3.1 on Ubuntu 10.04
+;; and Mac OS X 10.8.3, and won't be run with any version of XEmacs.
 
 ;;; Commentary:
 ;;
