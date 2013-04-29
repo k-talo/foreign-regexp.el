@@ -700,6 +700,11 @@ should match a new line character by \".\".")
 should use extended regexp.")
 (make-variable-buffer-local 'foreign-regexp/use-extended-regexp-p)
 
+(defvar foreign-regexp/eval-rpla-p nil
+  "Non-nil if replace with foreign regexp
+should eval replacement string.")
+(make-variable-buffer-local 'foreign-regexp/eval-rpla-p)
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -715,6 +720,9 @@ should use extended regexp.")
 (defvar foreign-regexp/dot-match-will-change-hook nil
   "Normal hook run before toggle `foreign-regexp/dot-match-a-newline-p'.")
 
+(defvar foreign-regexp/eval-rpla-will-change-hook nil
+  "Normal hook run before toggle `foreign-regexp/eval-rpla-p'.")
+
 (defvar foreign-regexp/case-fold-changed-hook nil
   "Normal hook run after toggle `case-fold-search'.")
 
@@ -723,6 +731,9 @@ should use extended regexp.")
 
 (defvar foreign-regexp/dot-match-changed-hook nil
   "Normal hook run after toggle `foreign-regexp/dot-match-a-newline-p'.")
+
+(defvar foreign-regexp/eval-rpla-changed-hook nil
+  "Normal hook run after toggle `foreign-regexp/use-extended-regexp-p'")
 
 
 ;; ----------------------------------------------------------------------------
@@ -758,6 +769,15 @@ supported by current foreign regexp."
   (and (not (string-equal "" foreign-regexp/search-option-indicator/dot-match-str))
        (not (string-equal "" foreign-regexp/search-option-indicator/no-dot-match-str))))
 
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/eval-rpla-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/eval-rpla-available-p ()
+  "Test if the replacement option `Eval Replacement' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/eval-rpla))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-eval-rpla))))
+
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -788,8 +808,8 @@ supported by current foreign regexp."
   
   (when (not no-message)
     (minibuffer-message
-     (format "[foreign-regexp] case %ssensitive"
-             (if case-fold-search "in" "")))))
+     (format "[foreign-regexp] Turned %s search option `Case Insensitive'."
+             (if case-fold-search "on" "off")))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/toggle-dot-match &optional no-message) => VOID
@@ -808,8 +828,8 @@ supported by current foreign regexp."
   
   (when (not no-message)
     (minibuffer-message
-     (format "[foreign-regexp] . %s newline"
-             (if foreign-regexp/dot-match-a-newline-p "matches" "does not match")))))
+     (format "[foreign-regexp] Turned %s search option `. Matches newline'."
+             (if foreign-regexp/dot-match-a-newline-p "on" "off")))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/toggle-ext-regexp &optional no-message) => VOID
@@ -828,8 +848,28 @@ supported by current foreign regexp."
   
   (when (not no-message)
     (minibuffer-message
-     (format "[foreign-regexp] %sextended regexp"
-             (if foreign-regexp/use-extended-regexp-p "" "no ")))))
+     (format "[foreign-regexp] Turned %s search option `Extended Regexp'."
+             (if foreign-regexp/use-extended-regexp-p "on" "off")))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/toggle-eval-rpla &optional no-message) => VOID
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/toggle-eval-rpla (&optional no-message)
+  "Toggle `foreign-regexp/eval-rpla-p'."
+  (interactive)
+  
+  (when (not (foreign-regexp/eval-rpla-available-p))
+    (error "[foreign-regexp] Replacement option `Eval Replacement' is not supported by current foreign regexp."))
+  
+  (run-hooks 'foreign-regexp/eval-rpla-will-change-hook)
+  (setq foreign-regexp/eval-rpla-p
+        (not foreign-regexp/eval-rpla-p))
+  (run-hooks 'foreign-regexp/eval-rpla-changed-hook)
+  
+  (when (not no-message)
+    (minibuffer-message
+     (format "[foreign-regexp] Turned %s replacement option `Eval Replacement'."
+             (if foreign-regexp/eval-rpla-p "on" "off")))))
 
 
 ;; ----------------------------------------------------------------------------
@@ -1057,6 +1097,20 @@ regexp does not support this search option.")
 Set empty string to this variable when the foreign
 regexp does not support this search option.")
 
+(defvar foreign-regexp/search-option-indicator/eval-rpla "Eval"
+  "A string displayed when the search option
+`foreign-regexp/eval-rpla-p' is on.
+
+Set empty string to this variable when the foreign
+regexp does not support this replacement option.")
+
+(defvar foreign-regexp/search-option-indicator/no-eval-rpla ""
+  "A string displayed when the search option
+`foreign-regexp/eval-rpla-p' is off.
+
+Set empty string to this variable when the foreign
+regexp does not support this replacement option.")
+
 (defvar foreign-regexp/search-option-indicator/separator-str " "
   "A string displayed between search option strings.")
 
@@ -1105,7 +1159,15 @@ regexp does not support this search option.")
                   foreign-regexp/search-option-indicator/no-dot-match-str)
                 (if foreign-regexp/use-extended-regexp-p
                     foreign-regexp/search-option-indicator/ext-regexp-str 
-                  foreign-regexp/search-option-indicator/no-ext-regexp-str))))
+                  foreign-regexp/search-option-indicator/no-ext-regexp-str)
+                (cond
+                 ((and (symbolp foreign-regexp/transition/.running-cmd)
+                       (get foreign-regexp/transition/.running-cmd 'foreign-regexp/replace-command-p))
+                  (if foreign-regexp/eval-rpla-p
+                      foreign-regexp/search-option-indicator/eval-rpla
+                    foreign-regexp/search-option-indicator/no-eval-rpla))
+                 (t
+                  "")))))
 
 
 ;;; ===========================================================================
@@ -1145,6 +1207,7 @@ and `foreign-regexp/occur'."
   (let ((foreign-regexp/case-fold-will-change-hook  foreign-regexp/case-fold-will-change-hook)
         (foreign-regexp/dot-match-will-change-hook  foreign-regexp/dot-match-will-change-hook)
         (foreign-regexp/ext-regexp-will-change-hook foreign-regexp/ext-regexp-will-change-hook)
+        (foreign-regexp/eval-rpla-will-change-hook  foreign-regexp/eval-rpla-will-change-hook)
         (orig-prompt      (copy-sequence prompt))
         (initial-contents initial-contents))
     (unwind-protect
@@ -1172,7 +1235,8 @@ and `foreign-regexp/occur'."
                                                    (foreign-regexp/.signal-option-changed)))))
              '((foreign-regexp/case-fold-will-change-hook  foreign-regexp/toggle-case-fold)
                (foreign-regexp/dot-match-will-change-hook  foreign-regexp/toggle-dot-match)
-               (foreign-regexp/ext-regexp-will-change-hook foreign-regexp/toggle-ext-regexp))))
+               (foreign-regexp/ext-regexp-will-change-hook foreign-regexp/toggle-ext-regexp)
+               (foreign-regexp/eval-rpla-will-change-hook  foreign-regexp/toggle-eval-rpla))))
           
           ;; Whenever search option is changed, restart `read-from-minibuffer' to
           ;; redisplay prompt.
@@ -1290,7 +1354,7 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
                         ("Regexp Type"
                          :filter (lambda (&rest args)
                                    (foreign-regexp/menu/regexp-type-menu-gen)))
-                        ("--")
+                        ["--" 'ignore]
                         ["Case Insensitive" foreign-regexp/toggle-case-fold
                          :style    radio
                          :selected (and (foreign-regexp/case-fold-available-p)
@@ -1307,13 +1371,19 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
                          :style    radio
                          :selected (and (foreign-regexp/ext-regexp-available-p)
                                         foreign-regexp/use-extended-regexp-p)
-                         :active   (foreign-regexp/ext-regexp-available-p)])
+                         :active   (foreign-regexp/ext-regexp-available-p)]
+                        ;;["--" 'ignore] ;; XXX: This makes `Eval Replacement' always active...
+                        ["Eval Replacement" foreign-regexp/toggle-eval-rpla
+                         :style    radio
+                         :selected (and (foreign-regexp/eval-rpla-available-p)
+                                        foreign-regexp/eval-rpla-p)
+                         :active   (foreign-regexp/eval-rpla-available-p)])
                       "goto")
 
   ;; XXX: Should be removed?
   (easy-menu-add-item menu-bar-edit-menu
                       nil
-                      '("---")
+                      ["--" 'ignore]
                       "goto")
 
 
@@ -1452,6 +1522,7 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
     (define-key search-map          "\M-i" 'foreign-regexp/toggle-case-fold)
     (define-key search-map          "\M-m" 'foreign-regexp/toggle-dot-match)
     (define-key search-map          "\M-x" 'foreign-regexp/toggle-ext-regexp)
+    (define-key search-map          "\M-e" 'foreign-regexp/toggle-eval-rpla)
     
     (define-key reb-mode-search-map "\M-i" 'foreign-regexp/re-builder/toggle-case-fold-on-target-buffer)
     (define-key reb-mode-search-map "\M-m" 'foreign-regexp/re-builder/toggle-dot-match-on-target-buffer)
@@ -1588,7 +1659,7 @@ more information."
   (foreign-regexp/replace/assert-available)
   (foreign-regexp/replace/perform-replace
    regexp replacement t nil nil nil nil start end))
-
+(put 'foreign-regexp/query-replace 'foreign-regexp/replace-command-p t)
 
 ;; ----------------------------------------------------------------------------
 ;;
@@ -1638,7 +1709,8 @@ the list `foreign-regexp/replace/ovs-on-match/data'."
                   replacement
                   (if foreign-regexp/dot-match-a-newline-p "DOT" "")
                   (if case-fold-search "" "CASE")
-                  (if foreign-regexp/use-extended-regexp-p "EXT" ""))))
+                  (if foreign-regexp/use-extended-regexp-p "EXT" "")
+                  (if foreign-regexp/eval-rpla-p "EVAL" ""))))
     (foreign-regexp/replace/parse-search-result result offset min max)
     
     ;; Detect index of neighborhood overlay of a pointer.
@@ -4216,6 +4288,8 @@ as the value of a tag."
                                                 indicator-no-ext-regexp
                                                 indicator-dot-match
                                                 indicator-no-dot-match
+                                                indicator-eval-rpla
+                                                indicator-no-eval-rpla
                                                 indicator-separator
                                                 script-search
                                                 script-replace
@@ -4261,6 +4335,12 @@ Arguments are:
   INDICATOR-NO-EXT-REGEXP:
         See `foreign-regexp/search-option-indicator/no-ext-regexp-str'.
       
+  INDICATOR-EVAL-RPLA:
+        See `foreign-regexp/search-option-indicator/eval-rpla'.
+  
+  INDICATOR-NO-EVAL-RPLA:
+        See `foreign-regexp/search-option-indicator/no-eval-rpla'.
+  
   INDICATOR-SEPARATOR:
         See `foreign-regexp/search-option-indicator/separator-str'.
       
@@ -4296,6 +4376,8 @@ Arguments are:
   (or indicator-no-ext-regexp (error "[foreign-regexp] No `:indicator-no-ext-regexp'!"))
   (or indicator-dot-match     (error "[foreign-regexp] No `:indicator-dot-match'!"))
   (or indicator-no-dot-match  (error "[foreign-regexp] No `:indicator-no-dot-match'!"))
+  (or indicator-eval-rpla     (error "[foreign-regexp] No `:indicator-eval-rpla'!"))
+  (or indicator-no-eval-rpla  (error "[foreign-regexp] No `:indicator-no-eval-rpla'!"))
   (or indicator-separator     (error "[foreign-regexp] No `:indicator-separator'!"))
   (or wsp-regexp-for-align    (error "[foreign-regexp] No `:wsp-regexp-for-align'!"))
 
@@ -4321,6 +4403,8 @@ Arguments are:
               :indicator-no-ext-regexp  indicator-no-ext-regexp
               :indicator-dot-match      indicator-dot-match
               :indicator-no-dot-match   indicator-no-dot-match
+              :indicator-eval-rpla      indicator-eval-rpla
+              :indicator-no-eval-rpla   indicator-no-eval-rpla
               :indicator-separator      indicator-separator
               :script-search            script-search
               :script-replace           script-replace
@@ -4381,6 +4465,8 @@ Arguments are:
     (setq foreign-regexp/search-option-indicator/no-ext-regexp-str (cadr (memq :indicator-no-ext-regexp kv-lst)))
     (setq foreign-regexp/search-option-indicator/dot-match-str     (cadr (memq :indicator-dot-match    kv-lst)))
     (setq foreign-regexp/search-option-indicator/no-dot-match-str  (cadr (memq :indicator-no-dot-match kv-lst)))
+    (setq foreign-regexp/search-option-indicator/eval-rpla         (cadr (memq :indicator-eval-rpla    kv-lst)))
+    (setq foreign-regexp/search-option-indicator/no-eval-rpla      (cadr (memq :indicator-no-eval-rpla kv-lst)))
     (setq foreign-regexp/search-option-indicator/separator-str     (cadr (memq :indicator-separator    kv-lst)))
     (setq foreign-regexp/search/external-command                   (cadr (memq :cmd-path-search        kv-lst)))
     (setq foreign-regexp/search/shell-script                       (cadr (memq :script-search          kv-lst)))
@@ -4822,6 +4908,8 @@ main
  :indicator-no-ext-regexp "-"
  :indicator-dot-match     "s"
  :indicator-no-dot-match  "-"
+ :indicator-eval-rpla     "e"
+ :indicator-no-eval-rpla  "-"
  :indicator-separator     "")
 
 (foreign-regexp/regexp-type/define
@@ -4839,10 +4927,12 @@ main
  :indicator-no-ext-regexp "-"
  :indicator-dot-match     "m"
  :indicator-no-dot-match  "-"
+ :indicator-eval-rpla     "b"
+ :indicator-no-eval-rpla  "-"
  :indicator-separator     "")
 
 ;; Local variables:
-;; byte-compile-warnings: (not cl-functions)
+;; byte-compile-warnings: (not cl-functions free-vars)
 ;; End:
 
 ;;; foreign-regexp.el ends here
