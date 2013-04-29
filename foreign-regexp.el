@@ -4615,36 +4615,26 @@ package main;
 use English qw( -no_match_vars );
 use FileHandle;
 
-sub generate_build_replacement_fn {
-    # Eval replacement string in environment
+sub interpolate_fn_gen {
+    # Interpolate replacement string in environment
     # which has no lexical variable.
     #
     # Special-variables in the replacement string
     # will be interpolated.
-    eval 'sub {\"'.$_[0].'\"}';
+    eval 'sub {\"'. escape_str_for_interpolate_fn_gen($_[0]) .'\"}';
 }
 
-sub eval_replacement {
-    eval $_[0]
+sub eval_fn_gen {
+    # Eval replacement string in environment
+    # which has no lexical variable.
+    eval 'sub {'.$_[0].'}';
 }
 
-sub interpolate_replacement {
-    eval '\"'.$_[0].'\"'
-}
-
-sub eval_and_interpolate_replacement {
-    # Not tested yet.
-    my $str_repl = shift;
-    $str_repl = eval_replacement($str_repl);
-    die \"Error while evaluating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
-    $str_repl = interpolate_replacement($str_repl);
-    die \"Error while interpolating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
-    $str_repl
-}
-
-sub escape_str_to_eval {
-    my $r_txt = shift;
-    ${$r_txt} =~ s/\"/\\\\\"/og;
+sub escape_str_for_interpolate_fn_gen {
+    my $txt = shift;
+    $txt =~ s/\\\\/\\\\\\\\/og;
+    $txt =~ s/\"/\\\\\"/og;
+    $txt
 }
 
 sub escape_perl_str_for_emacs {
@@ -4660,9 +4650,10 @@ sub main () {
     my $fn_repl   = shift @ARGV or die \"No replacement file name!\";
     my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
     my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
-    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";;
+    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";
+    my $eval_p    = @ARGV ? shift(@ARGV) : die \"No eval flag.\";
     my $code      = 'utf8';
-    
+	
     my($str_in, $str_pat, $str_repl);
     use PerlIO::encoding;
     local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
@@ -4677,10 +4668,14 @@ sub main () {
                    (!$case_p ? \"i\" : \"\") .
                    ( $ext_p  ? \"x\" : \"\"));
     die $EVAL_ERROR if $EVAL_ERROR;
-    
-    escape_str_to_eval(\\$str_repl);
-    my $build_replacement_fn = generate_build_replacement_fn($str_repl);
-    die \"Error in replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+	
+    my $interpolate_fn;
+    if ($eval_p) {
+        $interpolate_fn = eval_fn_gen($str_repl);
+    } else {
+        $interpolate_fn = interpolate_fn_gen($str_repl);
+    }
+    die \"Syntax error in replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
     
     umask 0177;
     my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
@@ -4688,11 +4683,11 @@ sub main () {
     print $fh_out \"(setq result '(\", \"\\n\";
     
     while ($str_in =~ m/${pat}/omg) {
-        my $replacement = eval { $build_replacement_fn->() };
+        my $replacement = eval { $interpolate_fn->() };
         die \"Error while interpolating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
-            
+		
         escape_perl_str_for_emacs(\\$replacement);
-            
+		
         print $fh_out \" (\";
         print $fh_out $LAST_MATCH_START[0], ' ';
         print $fh_out $LAST_MATCH_END  [0], ' ';
@@ -4702,7 +4697,7 @@ sub main () {
     
     print $fh_out \"))\", \"\\n\";
     print $fh_out \";;; EOF\", \"\\n\";
-
+	
     exit 0;
 }
 
@@ -4717,8 +4712,8 @@ main();
 
 abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
 
-def escape_str_for_eval! (str)
-  str.gsub!(/\"/ ){'\\\\\"'}
+def escape_str_for_interpolate_fn_gen (str)
+  str.gsub(\"\\\\\"){\"\\\\\\\\\"}.gsub(/\"/ ){'\\\\\"'}
 end
 
 def escape_ruby_str_for_emacs! (str)
@@ -4726,8 +4721,42 @@ def escape_ruby_str_for_emacs! (str)
   str.gsub!(/\"/ ) {'\\\\\"'}
 end
 
+def process_replace (__str_in__, __pat__, __str_rpl__, __eval_p__)
+   begin
+    interpolate_fn = if __eval_p__
+                     then eval 'Proc.new {'+__str_rpl__+'}'
+                     else eval 'Proc.new {\"'+escape_str_for_interpolate_fn_gen(__str_rpl__)+'\"}' end
+  rescue SyntaxError
+    $stderr.print \"Syntax error in replacement \\\"#{__str_rpl__}\\\".\\n\"
+    $stderr.print $!.message
+    exit 1
+  end
+  
+  print \"(setq result '(\"
+  
+  __str_in__.scan( __pat__ ) do |m|
+    begin
+      __replacement__ = interpolate_fn.call(m).to_s
+      escape_ruby_str_for_emacs!(__replacement__)
+    rescue Exception
+      $stderr.print \"Error while evaluating replacement \\\"#{__str_rpl__}\\\".\\n\"
+      $stderr.print $!.message
+      exit 1
+    end
+    
+    print '('
+    print Regexp.last_match.begin(0), ' '
+    print Regexp.last_match.end(0),   ' '
+    print '\"', __replacement__, '\"'
+    print ')'
+  end
+  
+  print \"))\\n\"
+  print \";;; EOF\\n\"
+end
+
 def main ()
-  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p = ARGV
+  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p, eval_p = ARGV
   
   str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
   str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
@@ -4737,34 +4766,16 @@ def main ()
                              (case_p.empty? ? Regexp::IGNORECASE : 0) |
                              (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
   
-  escape_str_for_eval!(str_rpl)
-  
   $stdout = open(fn_out, 'w:UTF-8')
   
-  print \"(setq result '(\"
+  process_replace(str_in, pat, str_rpl, eval_p.empty? ? nil : true)
   
-  str_in.scan( pat ) do |m|
-    replacement = eval '\"' + str_rpl + '\"'
-    escape_ruby_str_for_emacs!(replacement)
-    
-    print '('
-    print Regexp.last_match.begin(0), ' '
-    print Regexp.last_match.end(0),   ' '
-    print '\"', replacement, '\"'
-    print ')'
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-  
-rescue RegexpError
+rescue Exception
   $stderr.print $!.message
   exit 1
 end
 
-main
+main()
 
 # EOF
 
