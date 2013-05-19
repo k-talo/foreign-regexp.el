@@ -878,6 +878,19 @@ supported by current foreign regexp."
 ;;
 ;; ----------------------------------------------------------------------------
 
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/.format-external-command-arg arg) => STRING
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/.format-external-command-arg (arg)
+  (cond
+   ((null     arg) "")
+   ((stringp  arg) arg)
+   ((integerp arg) (format "%s" arg))
+   ((markerp  arg) (format "%s" (marker-position arg)))
+   (t
+    (error "[foreign-regexp] The type of command arg `%s' is invalid." arg))))
+
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/run-external-command cmd-path shell-script body
 ;;                                       regexp replacement &rest other-args)
@@ -961,7 +974,8 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
                                  ,fn-in-result
                                  ,fn-out-regexp
                                  ,@(if replacement (list fn-out-replacement) nil)
-                                 ,@other-args))))
+                                 ,@(mapcar #'foreign-regexp/.format-external-command-arg
+                                           other-args)))))
             (when (not (and (numberp status)
                             (zerop status)))
               (error "[foreign-regexp] ERROR(%s): %s"
@@ -1551,62 +1565,110 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
 ;;; ===========================================================================
 
 (defvar foreign-regexp/replace/external-command nil
-  "Path of an external command to use to execute actual search operation.
+  "Path of an external command which executes actual search/replace
+operation.
 
-Seven arguments describe below will be passed to the command.
+Twelve arguments describe below will be passed to the command.
 
- 1st: Path of a file which contains the text to be searched.
+  1st: Path of a file which contains the text to which the
+       search/replace operation will be applied.
+       
+       The text in this file is encoded in the value of
+       `foreign-regexp/output-coding-system'.
+       
+  2nd: Path of a file to which the command should write the result
+       of current search operation.
+       
+       The external command have to output a form like:
+       
+         (setq result 
+               (
+                ;; Search results by non warp-around search.
+                (((1st-MATCH-START 1st-MATCH-END
+                   1st-MATCH-CAPTURE-0-START 1st-MATCH-CAPTURE-0-END
+                   1st-MATCH-CAPTURE-1-START 1st-MATCH-CAPTURE-1-END
+                   ...)
+                  \"REPLACEMENT-FOR-1st-MATCH\")
+                 ((2nd-MATCH-START 2nd-MATCH-END
+                   2nd-MATCH-CAPTURE-0-START 2nd-MATCH-CAPTURE-0-END
+                   2nd-MATCH-CAPTURE-1-START 2nd-MATCH-CAPTURE-1-END
+                   ...)
+                  \"REPLACEMENT-FOR-2nd-MATCH\")
+                 ...)
+                ;; Search results by warp-around search.
+                (...
+                 ((Nth-MATCH-START Nth-MATCH-END
+                   Nth-MATCH-CAPTURE-0-START Nth-MATCH-CAPTURE-0-END
+                   Nth-MATCH-CAPTURE-1-START Nth-MATCH-CAPTURE-1-END
+                   ...)
+                  \"REPLACEMENT-FOR-Nth-MATCH\"))))
+       
+       to this file.
+       
+       Note that each start and end position in the form should be
+       an offset from beginning of the text which has been searched.
+       (This means each number should be started from 0, not from 1)
+       
+       The text in this file must be encoded in the value of
+       `foreign-regexp/input-coding-system'.
+       
+  3rd: Path of a file in which the regexp we want to search is written.
+       The command have a responsibility to search this regexp
+       from the file specified by 1st argument, then write start and
+       end positions of each match to the file specified by 2nd argument.
+       
+       The text in this file is encoded in the value of
+       `foreign-regexp/output-coding-system'.
+       
+  4th: Path of a file in which the replacement expression is written.
+       The command have a responsibility to interpolate variables
+       in the expression on each match, or evaluate it when the 8th
+       argument is not empty string or non-nil, then write them to
+       the file specified by 2nd argument.
+ 
+       The text in this file is encoded in the value of
+       `foreign-regexp/output-coding-system'.
+       
+  5th: A dot matches newline flag.
+       When the value of this flag is not empty string or non-nil,
+       the character `.' should be matched to a newline character.
+       
+  6th: A case sensitive flag.
+       When the value of this flag is not empty string or non-nil,
+       the match operation should be done case-sensitively.
+       
+  7th: An extended regular expression flag.
+       When the value of this flag is not empty string or non-nil,
+       the current search regexp (see 3rd argument) should be
+       interpreted as extended regular expression.
+       
+  8th: An eval replacement as expression flag.
+       When the value of this flag is not empty string or non-nil,
+       replacement expression given by 3rd argument will
+       be evaluated as an expression when the foreign regexp
+       supports this feature.
+       
+  9th: The number of search limit.
+       The search/replace operation will be stopped when the count
+       of the match is reached to this number.
+       When the value of this argument is empty string or `NIL',
+       the search/replacement operation will be applied unlimited
+       
+ 10th: Current point. (start from zero)
+       When the value of this argument is empty string or `NIL',
+       the search/replacement operation will be stated from
+       beginning of the text.
 
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
+ 11th: Start point of region that the search/replace operation
+       should be applied. (start from zero)
+       When this value is empty string or nil, the search will be
+       applied to whole of the text.
 
- 2nd: Path of a file to which the command should write the result
-      of current search operation.
-
-      The external command have to output a form like:
-
-        (setq result
-              '((1st-MATCH-START 1st-MATCH-END \"REPLACEMENT-FOR-1st-MATCH\")
-                (2nd-MATCH-START 2nd-MATCH-END \"REPLACEMENT-FOR-2nd-MATCH\")
-                ...))
-
-      to this file.
-
-      Note that each start and end position in the form should be
-      an offset from beginning of the text which has been searched.
-      (This means each number should be started from 0, not from 1)
-
-      The text in this file must be encoded in the value of
-      `foreign-regexp/input-coding-system'.
-
- 3rd: Path of a file in which the regexp we want to search is written.
-      The command have a responsibility to search this regexp
-      from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 4th: Path of a file in which the replacement expression is written.
-      The command have a responsibility to interpolate variables
-      in the expression on each match, then write them to the file
-      specified by 2nd argument.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 5th: A dot matches newline flag.
-      When the value of this flag is not empty string,
-      . should be matched to a newline character.
-
- 6th: A case sensitive flag.
-      When the value of this flag is not empty string,
-      the match operation should be done case-sensitive.
-
- 7th: An extended regular expression flag.
-      When the value of this flag is not empty string,
-      the current search regexp (see 3rd arg) should be
-      interpreted as extended regular expression.")
+ 12th: End point of region that the search/replace operation
+       should be applied. (start from zero)
+       When this value is empty string or nil, the search will be
+       applied to whole of the text.
+")
 
 (defvar foreign-regexp/replace/shell-script nil
   "A shell script which will be run as 
@@ -1687,7 +1749,7 @@ more information."
 ;;  (foreign-regexp/replace/search-by-external-command regexp replacement)
 ;;                                                                     => LIST
 ;; ----------------------------------------------------------------------------
-(defun foreign-regexp/replace/search-by-external-command (regexp replacement min max)
+(defun foreign-regexp/replace/search-by-external-command (regexp replacement min max &optional limit)
   "Scan current buffer with external command to detect matching
 texts by REGEXP.
 
@@ -1710,8 +1772,12 @@ the list `foreign-regexp/replace/ovs-on-match/data'."
                   (if foreign-regexp/dot-match-a-newline-p "DOT" "")
                   (if case-fold-search "" "CASE")
                   (if foreign-regexp/use-extended-regexp-p "EXT" "")
-                  (if foreign-regexp/eval-rpla-p "EVAL" ""))))
-    (foreign-regexp/replace/parse-search-result result offset min max)
+                  (if foreign-regexp/eval-rpla-p "EVAL" "")
+                  limit
+                  (- (point) offset)
+                  (and min (- min offset))
+                  (and max (- max offset)))))
+    (foreign-regexp/replace/parse-search-result result offset)
     
     ;; Detect index of neighborhood overlay of a pointer.
     (position (car (member-if
@@ -1723,25 +1789,43 @@ the list `foreign-regexp/replace/ovs-on-match/data'."
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/replace/parse-search-result result offset) => OVERLAYS
 ;; ----------------------------------------------------------------------------
-(defun foreign-regexp/replace/parse-search-result (result offset min max)
+(defun foreign-regexp/replace/parse-search-result (result offset)
   "Subroutine of `foreign-regexp/replace/search-by-external-command'."
   (foreign-regexp/replace/ovs-on-match/dispose)
-  ;; RESULT has structure like:
-  ;;   ((MATCH_START MATCH_END "REPLACEMENT")
-  ;;    ...)
+  ;; RESULT is a list which has a structure like below:
+  ;; (
+  ;;  ;; Search results by non warp-around search.
+  ;;  (((1st-MATCH-START 1st-MATCH-END
+  ;;     1st-MATCH-CAPTURE-0-START 1st-MATCH-CAPTURE-0-END
+  ;;     1st-MATCH-CAPTURE-1-START 1st-MATCH-CAPTURE-1-END
+  ;;     ...)
+  ;;    "REPLACEMENT-FOR-1st-MATCH")
+  ;;   ((2nd-MATCH-START 2nd-MATCH-END
+  ;;     2nd-MATCH-CAPTURE-0-START 2nd-MATCH-CAPTURE-0-END
+  ;;     2nd-MATCH-CAPTURE-1-START 2nd-MATCH-CAPTURE-1-END
+  ;;     ...)
+  ;;    "REPLACEMENT-FOR-2nd-MATCH")
+  ;;   ...)
+  ;;  ;; Search results by warp-around search.
+  ;;  (...
+  ;;   ((Nth-MATCH-START Nth-MATCH-END
+  ;;     Nth-MATCH-CAPTURE-0-START Nth-MATCH-CAPTURE-0-END
+  ;;     Nth-MATCH-CAPTURE-1-START Nth-MATCH-CAPTURE-1-END
+  ;;     ...)
+  ;;    "REPLACEMENT-FOR-Nth-MATCH")))
   ;;
   ;; NOTE: Special variables in "REPLACEMENT"
-  ;;       should be expanded by external command.
+  ;;       have to be expanded by external command.
   (save-excursion
     (let ((data    nil)
           (cur-buf (current-buffer)))
       ;;(message "[foreign-regexp] Parsing search results from external command...")
-      (dolist (lst result)
-        (let* ((beg         (+ (nth 0 lst) offset))
-               (end         (+ (nth 1 lst) offset))
-               (replacement (nth 2 lst)))
-          (when (and (not (and min (< beg min)))
-                     (not (and max (< max end))))
+      (dolist (lst (reverse result))
+        (dolist (item lst)
+          (let* ((pos-lst     (nth 0 item))
+                 (beg         (+ (nth 0 pos-lst) offset))
+                 (end         (+ (nth 1 pos-lst) offset))
+                 (replacement (nth 1 item)))
             (foreign-regexp/replace/ovs-on-match/add beg end cur-buf replacement))))
       ;;(message "[foreign-regexp] Parsing search results from external command...done")
       )))
@@ -1822,18 +1906,18 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
     (push-mark)
     (undo-boundary)
     (unwind-protect
-        (cl-flet ((update-real-match-data (idx)
-                                          (setq real-match-data
-                                                (let ((ov (foreign-regexp/replace/ovs-on-match/get-nth idx)))
-                                                  (when ov
-                                                    (list (overlay-start ov)
-                                                          (overlay-end   ov)))))
-                                          (set-match-data real-match-data)
-                                          real-match-data)
-                  (update-next-replacement (idx)
-                                           (setq next-replacement
-                                                 (overlay-get (foreign-regexp/replace/ovs-on-match/get-nth idx)
-                                                              'foreign-regexp/replace/replacement))))
+        (flet ((update-real-match-data (idx)
+                                       (setq real-match-data
+                                             (let ((ov (foreign-regexp/replace/ovs-on-match/get-nth idx)))
+                                               (when ov
+                                                 (list (overlay-start ov)
+                                                       (overlay-end   ov)))))
+                                       (set-match-data real-match-data)
+                                       real-match-data)
+               (update-next-replacement (idx)
+                                        (setq next-replacement
+                                              (overlay-get (foreign-regexp/replace/ovs-on-match/get-nth idx)
+                                                           'foreign-regexp/replace/replacement))))
           ;; Loop finding occurrences that perhaps should be replaced.
           (while (and idx
                       keep-going
@@ -2715,12 +2799,7 @@ in BUF for REGEXP by external command."
                  (if foreign-regexp/dot-match-a-newline-p "DOT"  "")
                  (if (not case-fold-p)                  "CASE" "") 
                  (if foreign-regexp/use-extended-regexp-p "EXT"  "")
-                 (cond
-                  ((null     limit) "")
-                  ((integerp limit) (format "%s" limit))
-                  (t
-                   (error "[foreign-regexp] `%s' is not type of number or null."
-                          limit)))))
+                 limit))
 
           (dolist (be-lst result)
             (dotimes (i (length be-lst))
@@ -4604,6 +4683,7 @@ main
 ")
 
 (defvar foreign-regexp/shell-script/foreign-regexp-replace-aux.pl "#!/usr/bin/env perl
+# -*- coding: utf-8-unix -*-
 use strict;
 use warnings;
 use 5.008;
@@ -4621,13 +4701,13 @@ sub interpolate_fn_gen {
     #
     # Special-variables in the replacement string
     # will be interpolated.
-    eval 'sub {\"'. escape_str_for_interpolate_fn_gen($_[0]) .'\"}';
+    eval 'sub {\"'. escape_str_for_interpolate_fn_gen(${$_[0]}) .'\"}';
 }
 
 sub eval_fn_gen {
     # Eval replacement string in environment
     # which has no lexical variable.
-    eval 'sub {'.$_[0].'}';
+    eval 'sub {'.${$_[0]}.'}';
 }
 
 sub escape_str_for_interpolate_fn_gen {
@@ -4643,61 +4723,126 @@ sub escape_perl_str_for_emacs {
     ${$r_txt} =~ s/\"/\\\\\"/og;
 }
 
+sub process_replace {
+    my $r_str_body   = shift;
+    my $r_str_regx   = shift;
+    my $r_str_repl   = shift;
+    my $dot_p        = shift;
+    my $case_p       = shift;
+    my $ext_p        = shift;
+    my $eval_p       = shift;
+    my $limit        = shift;
+    my $pos_start    = shift;
+    my $rgn_beg      = shift;
+    my $rgn_end      = shift;
+    
+    my $pos_wrap_end = undef;
+    my $count        = 0;
+    
+    my $regx = eval (\"qr/\\${\\$r_str_regx}/mo\" .
+                     ( $dot_p  ? \"s\" : \"\") .
+                     (!$case_p ? \"i\" : \"\") .
+                     ( $ext_p  ? \"x\" : \"\"));
+    die $EVAL_ERROR if $EVAL_ERROR;
+    
+    my $interpolate_fn = ($eval_p
+                          ? eval_fn_gen($r_str_repl)
+                          : interpolate_fn_gen($r_str_repl));
+    die \"Syntax error in replacement \\\"${$r_str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+    
+    my $replace_fn = sub {
+        my $rgn_beg = shift;
+        my $rgn_end = shift;
+        my $wrap_p  = shift;
+        
+        
+        pos(${$r_str_body}) = $rgn_beg;
+        
+        while (((defined $limit) ? ($count < $limit) : 1) && (${$r_str_body} =~ m/${regx}/g)) {
+            my $match_beg = $LAST_MATCH_START[0];
+            my $match_end = $LAST_MATCH_END  [0];
+            
+            last if (($match_beg > $rgn_end) || ($match_end > $rgn_end));
+            last if ($wrap_p && (defined $pos_wrap_end) && ($pos_wrap_end <= $match_beg));
+            $pos_wrap_end = $match_beg if ((not $wrap_p) && (not (defined $pos_wrap_end)));
+            
+            my $replacement = eval { $interpolate_fn->() };
+            die \"Error while interpolating replacement \\\"${$r_str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
+            
+            escape_perl_str_for_emacs(\\$replacement);
+            
+            print \" ((\";
+            print $match_beg, ' ';
+            print $match_end, ' ';
+            foreach my $i (1 .. $#LAST_MATCH_START) {
+                print $LAST_MATCH_START[$i], ' ';
+                print $LAST_MATCH_END  [$i], ' ';
+            }
+            print \" )\";
+            print '\"', $replacement, '\"';
+            print \" )\", \"\\n\";
+            
+            ++$count;
+        }
+    };
+    
+    $rgn_beg   = $rgn_beg || 0;
+    $rgn_end   = $rgn_end || length(${$r_str_body});
+    $pos_start = (($pos_start < $rgn_beg)
+                  ? $rgn_beg
+                  : (($pos_start > $rgn_end)
+                     ? $rgn_end
+                     : $pos_start));
+    
+    print \"(setq result '(\";
+    print \" (\";
+    $replace_fn->($pos_start, $rgn_end, 0);
+    print \" )\";
+    
+    # Search wrap around.
+    print \" (\";
+    $replace_fn->($rgn_beg,
+                  (defined $pos_wrap_end) ? $pos_wrap_end : $rgn_end,
+                  1);
+    print \" )\";
+    print \"))\", \"\\n\";
+    print \";;; EOF\", \"\\n\";
+}
+
 sub main () {
-    my $fn_in     = shift @ARGV or die \"No input  file name!\";
+    my $fn_body   = shift @ARGV or die \"No input file name!\";
     my $fn_out    = shift @ARGV or die \"No output file name!\";
-    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
+    my $fn_regx   = shift @ARGV or die \"No regexp file name!\";
     my $fn_repl   = shift @ARGV or die \"No replacement file name!\";
     my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
     my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
     my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";
-    my $eval_p    = @ARGV ? shift(@ARGV) : die \"No eval flag.\";
+    my $eval_p    = @ARGV ? shift(@ARGV) : die \"No eval replacement flag.\";
+    my $limit     = @ARGV ? shift(@ARGV) : die \"No search limit.\";
+    my $pos_start = shift @ARGV;
+    my $rgn_beg   = shift @ARGV;
+    my $rgn_end   = shift @ARGV;
+    
     my $code      = 'utf8';
-	
-    my($str_in, $str_pat, $str_repl);
+    
+    my($str_body, $str_regx, $str_repl);
+    
     use PerlIO::encoding;
     local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
     {
         local $INPUT_RECORD_SEPARATOR = undef;
-        $str_in   = FileHandle->new($fn_in,   \"<:encoding($code)\")->getline;
-        $str_pat  = FileHandle->new($fn_pat,  \"<:encoding($code)\")->getline;
+        $str_body = FileHandle->new($fn_body, \"<:encoding($code)\")->getline;
+        $str_regx = FileHandle->new($fn_regx, \"<:encoding($code)\")->getline;
         $str_repl = FileHandle->new($fn_repl, \"<:encoding($code)\")->getline;
     }
-    my $pat = eval(\"qr/\\${str_pat}/om\" .
-                   ( $dot_p  ? \"s\" : \"\") .
-                   (!$case_p ? \"i\" : \"\") .
-                   ( $ext_p  ? \"x\" : \"\"));
-    die $EVAL_ERROR if $EVAL_ERROR;
-	
-    my $interpolate_fn;
-    if ($eval_p) {
-        $interpolate_fn = eval_fn_gen($str_repl);
-    } else {
-        $interpolate_fn = interpolate_fn_gen($str_repl);
-    }
-    die \"Syntax error in replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
     
     umask 0177;
-    my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
+    *STDOUT = FileHandle->new($fn_out, \">:encoding($code)\");
     
-    print $fh_out \"(setq result '(\", \"\\n\";
+    process_replace(\\$str_body, \\$str_regx, \\$str_repl,
+                    $dot_p, $case_p, $ext_p, $eval_p,
+                    length($limit) ? $limit : undef,, $pos_start, $rgn_beg, $rgn_end);
     
-    while ($str_in =~ m/${pat}/omg) {
-        my $replacement = eval { $interpolate_fn->() };
-        die \"Error while interpolating replacement \\\"${str_repl}\\\":\\n${EVAL_ERROR}\" if $EVAL_ERROR;
-		
-        escape_perl_str_for_emacs(\\$replacement);
-		
-        print $fh_out \" (\";
-        print $fh_out $LAST_MATCH_START[0], ' ';
-        print $fh_out $LAST_MATCH_END  [0], ' ';
-        print $fh_out '\"', $replacement, '\"';
-        print $fh_out \" )\", \"\\n\";
-    }
-    
-    print $fh_out \"))\", \"\\n\";
-    print $fh_out \";;; EOF\", \"\\n\";
-	
     exit 0;
 }
 
@@ -4721,58 +4866,123 @@ def escape_ruby_str_for_emacs! (str)
   str.gsub!(/\"/ ) {'\\\\\"'}
 end
 
-def process_replace (__str_in__, __pat__, __str_rpl__, __eval_p__)
-   begin
-    interpolate_fn = if __eval_p__
-                     then eval 'Proc.new {'+__str_rpl__+'}'
-                     else eval 'Proc.new {\"'+escape_str_for_interpolate_fn_gen(__str_rpl__)+'\"}' end
-  rescue SyntaxError
-    $stderr.print \"Syntax error in replacement \\\"#{__str_rpl__}\\\".\\n\"
-    $stderr.print $!.message
-    exit 1
-  end
+def process_replace (__str_body__, __str_regx__, __str_repl__,
+                     __dot_p__, __case_p__, __ext_p__, __eval_p__,
+                     __limit__, __pos_start__, __rgn_beg__, __rgn_end__)
+  __pos_wrap_end__ = nil
+  __count__        = 0
+  
+  __regx__ = Regexp.new(__str_regx__, ((__dot_p__  ? Regexp::MULTILINE : 0)  |
+                                       (__case_p__ ? 0 : Regexp::IGNORECASE) |
+                                       (__ext_p__  ? Regexp::EXTENDED  : 0)))
+  __interpolate_fn__ = begin
+                         (__eval_p__ ?
+                          eval('Proc.new {'+__str_repl__+'}') :
+                          eval('Proc.new {\"'+escape_str_for_interpolate_fn_gen(__str_repl__)+'\"}'))
+                       rescue SyntaxError
+                         $stderr.print \"Syntax error in replacement \\\"#{__str_repl__}\\\".\\n\"
+                         $stderr.print $!.message
+                         exit! 1
+                       end
+  
+  __replace_fn__ = Proc.new { |__rgn_beg__, __rgn_end__, __wrap_p__|
+    __pos__ = __rgn_beg__
+    __last_0_width_pos__ = nil
+    
+    while ((__limit__ ? (__count__ < __limit__) : true)&& __str_body__.match(__regx__, __pos__)) do
+      m = Regexp.last_match
+      
+      __match_beg__ = m.begin(0)
+      __match_end__ = m.end  (0)
+      __0_width_p__ = (__match_beg__ == __match_end__)
+      
+      break if ((__match_beg__ > __rgn_end__) || (__match_end__ > __rgn_end__))
+      break if (__wrap_p__ && __pos_wrap_end__ && (__pos_wrap_end__ <= __match_beg__))
+      __pos_wrap_end__ = __match_beg__ if ((not __wrap_p__) && (not __pos_wrap_end__))
+      
+      if (__0_width_p__ && __last_0_width_pos__ && (__match_beg__ == __last_0_width_pos__)) then
+        # Do not enter into endless loop.
+        __pos__ += 1
+        break if (__pos__ > __rgn_end__)
+        next
+      elsif __0_width_p__ then
+        __last_0_width_pos__ = __match_beg__
+      else
+        __last_0_width_pos__ = nil
+      end
+      
+      __replacement__ = begin
+                          __interpolate_fn__.call(m).to_s
+                        rescue Exception
+                          $stderr.print \"Error while evaluating replacement \\\"#{__str_repl__}\\\".\\n\"
+                          $stderr.print $!.message, \"\\n\"
+                          exit! 1
+                        end
+      
+      escape_ruby_str_for_emacs!(__replacement__)
+      
+      print '(('
+      m.length.times {|i|
+        print m.begin(i), ' '
+        print m.end(i),   ' '
+      }
+      print ')'
+      print '\"', __replacement__, '\"'
+      print ')'
+      __count__ += 1
+      __pos__   = __match_end__
+    end
+  }
+
+  __rgn_beg__   = __rgn_beg__ || 0
+  __rgn_end__   = __rgn_end__ || __str_body__.length
+  __pos_start__ = ((__pos_start__ < __rgn_beg__) ?
+                   __rgn_beg__ :
+                   ((__pos_start__ > __rgn_end__) ?
+                    __rgn_end__ :
+                    __pos_start__))
   
   print \"(setq result '(\"
+  print \"(\"
+  __replace_fn__.call(__pos_start__, __rgn_end__, nil)
+  print \")\"
   
-  __str_in__.scan( __pat__ ) do |m|
-    begin
-      __replacement__ = interpolate_fn.call(m).to_s
-      escape_ruby_str_for_emacs!(__replacement__)
-    rescue Exception
-      $stderr.print \"Error while evaluating replacement \\\"#{__str_rpl__}\\\".\\n\"
-      $stderr.print $!.message
-      exit 1
-    end
-    
-    print '('
-    print Regexp.last_match.begin(0), ' '
-    print Regexp.last_match.end(0),   ' '
-    print '\"', __replacement__, '\"'
-    print ')'
-  end
-  
+  print \"(\"
+  __replace_fn__.call(__rgn_beg__,
+                      __pos_wrap_end__ ? __pos_wrap_end__ : __rgn_end__,
+                      true)
+  print \")\"
   print \"))\\n\"
   print \";;; EOF\\n\"
 end
 
 def main ()
-  fn_in, fn_out, fn_pat, fn_rpl, dot_p, case_p, ext_p, eval_p = ARGV
+  fn_body, fn_out, fn_regx, fn_repl,
+  dot_p, case_p, ext_p, eval_p,
+  limit, pt_start, rgn_beg, rgn_end  = ARGV
   
-  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  str_rpl = open(fn_rpl, 'r:UTF-8') {|f| f.read}
+  first_match_beg = nil
+
+  str_body = open(fn_body, 'r:UTF-8') {|f| f.read}
+  str_regx = open(fn_regx, 'r:UTF-8') {|f| f.read}
+  str_repl = open(fn_repl, 'r:UTF-8') {|f| f.read}
   
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
+  File.umask(0177)
   $stdout = open(fn_out, 'w:UTF-8')
   
-  process_replace(str_in, pat, str_rpl, eval_p.empty? ? nil : true)
+  process_replace(str_body, str_regx, str_repl, 
+                  dot_p.empty?    ? nil : true,
+                  case_p.empty?   ? nil : true,
+                  ext_p.empty?    ? nil : true,
+                  eval_p.empty?   ? nil : true,
+                  limit.empty?    ? nil : limit.to_i,
+                  pt_start.empty? ? nil : pt_start.to_i,
+                  rgn_beg.empty?  ? nil : rgn_beg.to_i,
+                  rgn_end.empty?  ? nil : rgn_end.to_i)
   
 rescue Exception
-  $stderr.print $!.message
-  exit 1
+  $stderr.print $!.message, \"\\n\"
+  exit! 1
 end
 
 main()
