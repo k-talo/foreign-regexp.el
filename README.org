@@ -216,16 +216,15 @@ Toggle search option `foreign-regexp/use-extended-regexp-p'.
 
 Toggle search option `foreign-regexp/toggle-eval-replacement'.
 
-**** 
 When this search option is on, the replacement string for
 a command `foreign-regexp/query-replace' will be evaluated
 as expression. For example, these commands:
   
-For `Perl':
-: M-s M-% ^ <RET> no strict 'vars';sprintf('%05d: ', ++$LINE) <RET>
-  
-For `Ruby':
-: M-s M-% ^ <RET> $LINE||=0;sprintf('%05d: ', $LINE+=1) <RET>
+- For `Perl':
+  : M-s M-% ^ <RET> no strict 'vars';sprintf('%05d: ', ++$LINE) <RET>
+
+- For `Ruby':
+  : M-s M-% ^ <RET> $LINE||=0;sprintf('%05d: ', $LINE+=1) <RET>
   
 put line number to beginning of each lines.
  
