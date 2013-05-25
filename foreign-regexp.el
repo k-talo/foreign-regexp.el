@@ -798,6 +798,40 @@ supported by current foreign regexp."
 
 ;; ----------------------------------------------------------------------------
 ;;
+;;  Functions
+;;
+;; ----------------------------------------------------------------------------
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/case-fold-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/case-fold-available-p ()
+  "Test if the search option `Case Insensitive Search' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/case-fold-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-case-fold-str))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/ext-regexp-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/ext-regexp-available-p ()
+  "Test if the search option `Extended Regular Expression' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/ext-regexp-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-ext-regexp-str))))
+
+;; ----------------------------------------------------------------------------
+;;  (foreign-regexp/case-fold-available-p) => BOOL
+;; ----------------------------------------------------------------------------
+(defun foreign-regexp/dot-match-available-p ()
+  "Test if the search option `. Matches a Newline' is \
+supported by current foreign regexp."
+  (and (not (string-equal "" foreign-regexp/search-option-indicator/dot-match-str))
+       (not (string-equal "" foreign-regexp/search-option-indicator/no-dot-match-str))))
+
+
+;; ----------------------------------------------------------------------------
+;;
 ;;  Commands
 ;;
 ;; ----------------------------------------------------------------------------
