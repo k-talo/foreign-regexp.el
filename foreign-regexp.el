@@ -91,7 +91,7 @@
 ;; Technical terms appear in this document are as follows.
 ;;
 ;; FOREIGN REGEXP:
-;;     A regular expression in syntax which is alien to Emacs.
+;;     A regular expression in syntax which is foreign to Emacs.
 ;;     Typically, it is not so much backslashy.
 ;;     By default, Regular expressions in syntax of `Perl' and
 ;;     `Ruby' can be used as FOREIGN REGEXP with this library.
