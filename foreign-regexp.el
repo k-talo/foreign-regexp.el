@@ -778,7 +778,7 @@ supported by current foreign regexp."
        (not (string-equal "" foreign-regexp/search-option-indicator/no-ext-regexp-str))))
 
 ;; ----------------------------------------------------------------------------
-;;  (foreign-regexp/case-fold-available-p) => BOOL
+;;  (foreign-regexp/dot-match-available-p) => BOOL
 ;; ----------------------------------------------------------------------------
 (defun foreign-regexp/dot-match-available-p ()
   "Test if the search option `. Matches a Newline' is \
