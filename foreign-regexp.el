@@ -2752,7 +2752,7 @@ in BUF for REGEXP by external command."
                         nil))
                parsed-result)
           ;; Remove replacement from result.
-          (dolist (lst result)
+          (dolist (lst (reverse result))
             (dolist (item lst)
               (setq parsed-result
                     (cons (mapcar #'(lambda (elm)
