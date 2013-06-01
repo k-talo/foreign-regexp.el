@@ -129,13 +129,13 @@ sub main () {
     my $fn_body   = shift @ARGV or die "No input file name!";
     my $fn_out    = shift @ARGV or die "No output file name!";
     my $fn_regx   = shift @ARGV or die "No regexp file name!";
-    my $fn_repl   = shift @ARGV or die "No replacement file name!";
+    my $fn_repl   = @ARGV ? shift @ARGV : die "No replacement file!";
     my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
     my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
     my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";
     my $eval_p    = @ARGV ? shift(@ARGV) : die "No eval replacement flag.";
     my $limit     = @ARGV ? shift(@ARGV) : die "No search limit.";
-    my $pos_start = shift @ARGV;
+    my $pos_start = @ARGV ? shift(@ARGV) : die "No start position.";
     my $rgn_beg   = shift @ARGV;
     my $rgn_end   = shift @ARGV;
     
@@ -149,7 +149,7 @@ sub main () {
         local $INPUT_RECORD_SEPARATOR = undef;
         $str_body = FileHandle->new($fn_body, "<:encoding($code)")->getline;
         $str_regx = FileHandle->new($fn_regx, "<:encoding($code)")->getline;
-        $str_repl = FileHandle->new($fn_repl, "<:encoding($code)")->getline;
+        $str_repl = $fn_repl ? FileHandle->new($fn_repl, "<:encoding($code)")->getline : "";
     }
     
     umask 0177;
@@ -157,7 +157,7 @@ sub main () {
     
     process_replace(\$str_body, \$str_regx, \$str_repl,
                     $dot_p, $case_p, $ext_p, $eval_p,
-                    length($limit) ? $limit : undef,, $pos_start, $rgn_beg, $rgn_end);
+                    length($limit) ? $limit : undef, $pos_start, $rgn_beg, $rgn_end);
     
     exit 0;
 }
