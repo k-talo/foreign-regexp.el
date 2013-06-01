@@ -430,7 +430,6 @@
 ;; write four external commands below with the language:
 ;; 
 ;;   `foreign-regexp/replace/external-command'
-;;   `foreign-regexp/search/external-command'
 ;;   `foreign-regexp/quote-meta/external-command'
 ;;
 ;; and install these commands with the function
@@ -2506,71 +2505,6 @@ foreign-regexp/replace/replacement."
 ;;;
 ;;; ===========================================================================
 
-(defvar foreign-regexp/search/external-command nil
-  "Path of an external command to use to execute actual search operation.
-
-Seven arguments describe below will be passed to the command.
-
- 1st: Path of a file which contains the text to be searched.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 2nd: Path of a file to which the command should write the result
-      of current search operation.
-
-      The external command have to output a form like:
-
-        (setq result
-              '((1st-MATCH-START 1st-MATCH-END
-                 SUB-MATCH-1-IN-1st-MATCH-START SUB-MATCH-1-IN-1st-MATCH-END
-                 SUB-MATCH-2-IN-1st-MATCH-START SUB-MATCH-2-IN-1st-MATCH-END
-                 ...)
-                (2nd-MATCH-START 2nd-MATCH-END
-                 SUB-MATCH-1-IN-2nd-MATCH-START SUB-MATCH-1-IN-2nd-MATCH-END
-                 SUB-MATCH-2-IN-2nd-MATCH-START SUB-MATCH-2-IN-2nd-MATCH-END
-                 ...)
-                ...)
-
-      to this file.
-
-      Note that each start and end position in the form should be
-      an offset from beginning of the text which has been searched.
-      (This means each number should be started from 0, not from 1)
-
-      The text in this file must be encoded in the value of
-      `foreign-regexp/input-coding-system'.
-
- 3rd: Path of a file in which the regexp we want to search is written.
-      The command have a responsibility to search this regexp
-      from the file specified by 1st argument, then write start and
-      end positions of each match to the file specified by 2nd argument.
-
-      The text in this file is encoded in the value of
-      `foreign-regexp/output-coding-system'.
-
- 4th: A dot matches newline flag.
-      When the value of this flag is not empty string,
-      . should be matched to a newline character.
-
- 5th: A case sensitive flag.
-      When the value of this flag is not empty string,
-      the match operation should be done case-sensitive.
-
- 6th: An extended regular expression flag.
-      When the value of this flag is not empty string,
-      the current search regexp (see 3rd arg) should be
-      interpreted as extended regular expression.
-
- 7th: Positive integer when we want limit the matches, or empty
-      string when we don't want limit the matches.")
-
-(defvar foreign-regexp/search/shell-script nil
-  "A shell script which will be run as
-`foreign-regexp/search/external-command'
-when it has nil value.")
-
-
 ;; ----------------------------------------------------------------------------
 ;;
 ;;  Commands
@@ -2682,8 +2616,7 @@ See also `re-search-backward'."
 ;; ----------------------------------------------------------------------------
 (defun foreign-regexp/search/available-p ()
   "Test if external command or shell script is defined or not."
-  (or foreign-regexp/search/external-command
-      foreign-regexp/search/shell-script))
+  (foreign-regexp/replace/available-p))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/search/assert-available) => VOID or ERROR
@@ -2800,29 +2733,35 @@ in BUF for REGEXP by external command."
                          "Update: %s, \"%s\"\n" buf regexp)
   (condition-case c
       (with-current-buffer buf
-        (let ((pt-min      (point-min))
-              (pt-max      (point-max))
-              (case-fold-p (if isearch-mode
-                               isearch-case-fold-search
-                             case-fold-search))
-              result)
-          (setq result
-                (foreign-regexp/run-external-command
-                 foreign-regexp/search/external-command
-                 foreign-regexp/search/shell-script
-                 (buffer-substring pt-min pt-max)
-                 regexp
-                 nil
-                 (if foreign-regexp/dot-match-a-newline-p "DOT"  "")
-                 (if (not case-fold-p)                  "CASE" "") 
-                 (if foreign-regexp/use-extended-regexp-p "EXT"  "")
-                 limit))
-
-          (dolist (be-lst result)
-            (dotimes (i (length be-lst))
-              (setf (nth i be-lst)
-                    (+ pt-min (nth i be-lst))))) ;; [Count + Offset => Count]
-
+        (let* ((pt-min (point-min))
+               (pt-max (point-max))
+               (offset (point-min))
+               (result (foreign-regexp/run-external-command
+                        foreign-regexp/replace/external-command
+                        foreign-regexp/replace/shell-script
+                        (buffer-substring pt-min pt-max)
+                        regexp
+                        ""
+                        (if foreign-regexp/dot-match-a-newline-p "DOT" "")
+                        (if case-fold-search "" "CASE")
+                        (if foreign-regexp/use-extended-regexp-p "EXT" "")
+                        nil
+                        limit
+                        (- (point) offset)
+                        nil
+                        nil))
+               parsed-result)
+          ;; Remove replacement from result.
+          (dolist (lst result)
+            (dolist (item lst)
+              (setq parsed-result
+                    (cons (mapcar #'(lambda (elm)
+                                      ;; Translate index to count.
+                                      (+ offset elm))
+                                  (car item))
+                          parsed-result))))
+	  (setq parsed-result (reverse parsed-result))
+          
           ;; Remove old cache.
           (foreign-regexp/search/cache/clear buf regexp)
 
@@ -2831,19 +2770,20 @@ in BUF for REGEXP by external command."
               (push (list buf)
                     foreign-regexp/search/.cache-alst))
           (push (cons regexp
-                      (list (cons 'data   result)
+                      (list (cons 'data   parsed-result)
                             (cons 'limit  limit)
                             (cons 'tick   (buffer-chars-modified-tick buf))
                             (cons 'pt-min pt-min)
                             (cons 'pt-max pt-max)))
                 (cdr (assq buf foreign-regexp/search/.cache-alst)))
-          result))
+          parsed-result))
     (error
      (unwind-protect
          ;; Remove old cache.
          (foreign-regexp/search/cache/clear buf regexp)
        (signal 'invalid-regexp
                (list (error-message-string c)))))))
+
 
   
 ;;; ===========================================================================
@@ -4366,10 +4306,8 @@ as the value of a tag."
 ;;                                       indicator-dot-match
 ;;                                       indicator-no-dot-match
 ;;                                       indicator-separator
-;;                                       cmd-path-search
 ;;                                       cmd-path-replace
 ;;                                       cmd-path-quote-meta
-;;                                       script-search
 ;;                                       script-replace
 ;;                                       script-quote-meta
 ;;                                       wsp-regexp-for-align) => VOID
@@ -4387,11 +4325,9 @@ as the value of a tag."
                                                 indicator-eval-replacement
                                                 indicator-no-eval-replacement
                                                 indicator-separator
-                                                script-search
                                                 script-replace
                                                 script-quote-meta
                                                 wsp-regexp-for-align
-                                                cmd-path-search
                                                 cmd-path-replace
                                                 cmd-path-quote-meta)
   ;; FIXME: Write document.
@@ -4440,18 +4376,12 @@ Arguments are:
   INDICATOR-SEPARATOR:
         See `foreign-regexp/search-option-indicator/separator-str'.
       
-  CMD-PATH-SEARCH:
-        See `foreign-regexp/search/external-command'.
-
   CMD-PATH-REPLACE:
         See `foreign-regexp/replace/external-command'.
 
   CMD-PATH-QUOTE-META:
         See `foreign-regexp/quote-meta/external-command'.
 
-  SCRIPT-SEARCH:
-        See `foreign-regexp/search/shell-script'.
-      
   SCRIPT-REPLACE:
         See `foreign-regexp/replace/shell-script'.
 
@@ -4477,9 +4407,6 @@ Arguments are:
   (or indicator-separator           (error "[foreign-regexp] No `:indicator-separator'!"))
   (or wsp-regexp-for-align          (error "[foreign-regexp] No `:wsp-regexp-for-align'!"))
 
-  (or script-search
-      cmd-path-search
-      (error "[foreign-regexp] No `:cmd-path-search' or `:cmd-path-search'!"))
   (or script-replace
       cmd-path-replace
       (error "[foreign-regexp] No `:script-replace' or `:cmd-path-replace'!"))
@@ -4502,10 +4429,8 @@ Arguments are:
               :indicator-eval-replacement    indicator-eval-replacement
               :indicator-no-eval-replacement indicator-no-eval-replacement
               :indicator-separator           indicator-separator
-              :script-search                 script-search
               :script-replace                script-replace
               :script-quote-meta             script-quote-meta
-              :cmd-path-search               cmd-path-search
               :cmd-path-replace              cmd-path-replace
               :cmd-path-quote-meta           cmd-path-quote-meta
               :wsp-regexp-for-align          wsp-regexp-for-align)
@@ -4564,8 +4489,6 @@ Arguments are:
     (setq foreign-regexp/search-option-indicator/eval-replacement-str    (cadr (memq :indicator-eval-replacement    kv-lst)))
     (setq foreign-regexp/search-option-indicator/no-eval-replacement-str (cadr (memq :indicator-no-eval-replacement kv-lst)))
     (setq foreign-regexp/search-option-indicator/separator-str           (cadr (memq :indicator-separator           kv-lst)))
-    (setq foreign-regexp/search/external-command                         (cadr (memq :cmd-path-search               kv-lst)))
-    (setq foreign-regexp/search/shell-script                             (cadr (memq :script-search                 kv-lst)))
     (setq foreign-regexp/replace/external-command                        (cadr (memq :cmd-path-replace              kv-lst)))
     (setq foreign-regexp/replace/shell-script                            (cadr (memq :script-replace                kv-lst)))
     (setq foreign-regexp/quote-meta/external-command                     (cadr (memq :cmd-path-quote-meta           kv-lst)))
@@ -5008,121 +4931,6 @@ main()
 
 ")
 
-(defvar foreign-regexp/shell-script/foreign-regexp-search-aux.pl "#!/usr/bin/env perl
-use strict;
-use warnings;
-use 5.008;
-
-use Encode;
-use utf8;
-
-use English qw( -no_match_vars );
-use FileHandle;
-
-sub main () {
-    my $fn_in     = shift @ARGV or die \"No input  file name!\";
-    my $fn_out    = shift @ARGV or die \"No output file name!\";
-    my $fn_pat    = shift @ARGV or die \"No pattern file name!\";
-    my $dot_p     = @ARGV ? shift(@ARGV) : die \"No dot matches new line flag.\";
-    my $case_p    = @ARGV ? shift(@ARGV) : die \"No case sensitive flag.\";
-    my $ext_p     = @ARGV ? shift(@ARGV) : die \"No extended regular expression flag.\";
-    my $limit     = @ARGV ? shift(@ARGV) : die \"No search limit.\";
-    my $code      = 'utf8';
-    
-    umask 0177;
-    
-    my($str_in, $str_pat, $str_repl);
-    use PerlIO::encoding;
-    local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
-    {
-        local $INPUT_RECORD_SEPARATOR = undef;
-        $str_in   = FileHandle->new($fn_in,  \"<:encoding($code)\")->getline;
-        $str_pat  = FileHandle->new($fn_pat, \"<:encoding($code)\")->getline;
-    }
-    
-    my $pat = eval(\"qr/\\${str_pat}/om\" .
-                   ( $dot_p  ? \"s\" : \"\") .
-                   (!$case_p ? \"i\" : \"\") .
-                   ( $ext_p  ? \"x\" : \"\"));
-    die $EVAL_ERROR if $EVAL_ERROR;
-    
-    {
-        my $fh_out = FileHandle->new($fn_out, \">:encoding($code)\");
-        
-        print $fh_out \"(setq result '(\";
-        
-        my $i = 0;
-        while (((!$limit) || (++$i <= $limit)) && ($str_in =~ m/${pat}/omg)) {
-            print $fh_out ' (';
-
-            foreach my $i (0 .. $#LAST_MATCH_START) {
-                print $fh_out $LAST_MATCH_START[$i], ' ';
-                print $fh_out $LAST_MATCH_END  [$i], ' ';
-            }
-            print $fh_out ')',;
-        }
-        
-        print $fh_out \"))\\n\";
-        print $fh_out \";;; EOF\\n\";
-    }
-    
-    exit 0;
-}
-
-main();
-
-# EOF
-
-")
-
-(defvar foreign-regexp/shell-script/foreign-regexp-search-aux.rb "#!/usr/bin/env ruby
-# -*- coding: utf-8-unix -*-
-
-abort \"Ruby version is too old (1.9 or later is required).\" if RUBY_VERSION < \"1.9\"
-
-def main ()
-  fn_in, fn_out, fn_pat, dot_p, case_p, ext_p, limit = ARGV
-  
-  str_in  = open(fn_in,  'r:UTF-8') {|f| f.read}
-  str_pat = open(fn_pat, 'r:UTF-8') {|f| f.read}
-  
-  pat = Regexp.new(str_pat, ((dot_p.empty?  ? 0 : Regexp::MULTILINE)  |
-                             (case_p.empty? ? Regexp::IGNORECASE : 0) |
-                             (ext_p.empty?  ? 0 : Regexp::EXTENDED)))
-  
-  $stdout = open(fn_out, 'w:UTF-8')
-  
-  print \"(setq result '(\"
-  
-  limit = (Integer limit rescue nil)
-  count = 0
-  
-  str_in.scan( pat ) do
-    break unless (!limit || ((count += 1) <= limit))
-    
-    print '('
-    Regexp.last_match.length.times {|i|
-      print Regexp.last_match.begin(i), ' '
-      print Regexp.last_match.end(i),   ' '
-    }
-    print ')'
-  end
-  
-  print \"))\\n\"
-  print \";;; EOF\\n\"
-  
-  exit 0
-
-rescue RegexpError
-  $stderr.print $!.message
-  exit 1
-end
-
-main
-
-# EOF
-
-")
 
 
 ;;; ===========================================================================
@@ -5136,7 +4944,6 @@ main
  :tag "Perl (v5.8 or later)"
  :input-coding-system           'utf-8-unix
  :output-coding-system          'utf-8-unix
- :script-search                 foreign-regexp/shell-script/foreign-regexp-search-aux.pl
  :script-replace                foreign-regexp/shell-script/foreign-regexp-replace-aux.pl
  :script-quote-meta             foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.pl
  :wsp-regexp-for-align           "([ \\t]+)"
@@ -5155,7 +4962,6 @@ main
  :tag "Ruby (v1.9 or later)"
  :input-coding-system           'utf-8-unix
  :output-coding-system          'utf-8-unix
- :script-search                 foreign-regexp/shell-script/foreign-regexp-search-aux.rb
  :script-replace                foreign-regexp/shell-script/foreign-regexp-replace-aux.rb
  :script-quote-meta             foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.rb
  :wsp-regexp-for-align           "([ \\t]+)"
