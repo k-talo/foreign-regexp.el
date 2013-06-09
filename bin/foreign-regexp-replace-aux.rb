@@ -12,7 +12,7 @@ def escape_ruby_str_for_emacs! (str)
   str.gsub!(/"/ ) {'\\"'}
 end
 
-def process_replace (__str_body__, __str_regx__, __str_repl__,
+def process_replace (__str_body__, __str_regx__, __str_rpla__,
                      __dot_p__, __case_p__, __ext_p__, __eval_p__,
                      __limit__, __pos_start__, __rgn_beg__, __rgn_end__)
   __pos_wrap_end__ = nil
@@ -23,10 +23,10 @@ def process_replace (__str_body__, __str_regx__, __str_repl__,
                                        (__ext_p__  ? Regexp::EXTENDED  : 0)))
   __interpolate_fn__ = begin
                          (__eval_p__ ?
-                          eval('Proc.new {'+__str_repl__+'}') :
-                          eval('Proc.new {"'+escape_str_for_interpolate_fn_gen(__str_repl__)+'"}'))
+                          eval('Proc.new {'+__str_rpla__+'}') :
+                          eval('Proc.new {"'+escape_str_for_interpolate_fn_gen(__str_rpla__)+'"}'))
                        rescue SyntaxError
-                         $stderr.print "Syntax error in replacement \"#{__str_repl__}\".\n"
+                         $stderr.print "Syntax error in replacement \"#{__str_rpla__}\".\n"
                          $stderr.print $!.message
                          exit! 1
                        end
@@ -60,7 +60,7 @@ def process_replace (__str_body__, __str_regx__, __str_repl__,
       __replacement__ = begin
                           __interpolate_fn__.call(m).to_s
                         rescue Exception
-                          $stderr.print "Error while evaluating replacement \"#{__str_repl__}\".\n"
+                          $stderr.print "Error while evaluating replacement \"#{__str_rpla__}\".\n"
                           $stderr.print $!.message, "\n"
                           exit! 1
                         end
@@ -103,7 +103,7 @@ def process_replace (__str_body__, __str_regx__, __str_repl__,
 end
 
 def main ()
-  fn_body, fn_out, fn_regx, fn_repl,
+  fn_body, fn_out, fn_regx, fn_rpla,
   dot_p, case_p, ext_p, eval_p,
   limit, pt_start, rgn_beg, rgn_end  = ARGV
   
@@ -111,12 +111,12 @@ def main ()
 
   str_body = open(fn_body, 'r:UTF-8') {|f| f.read}
   str_regx = open(fn_regx, 'r:UTF-8') {|f| f.read}
-  str_repl = open(fn_repl, 'r:UTF-8') {|f| f.read}
+  str_rpla = open(fn_rpla, 'r:UTF-8') {|f| f.read}
   
   File.umask(0177)
   $stdout = open(fn_out, 'w:UTF-8')
   
-  process_replace(str_body, str_regx, str_repl, 
+  process_replace(str_body, str_regx, str_rpla, 
                   dot_p.empty?    ? nil : true,
                   case_p.empty?   ? nil : true,
                   ext_p.empty?    ? nil : true,

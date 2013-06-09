@@ -42,7 +42,7 @@ sub escape_perl_str_for_emacs {
 sub process_replace {
     my $r_str_body   = shift;
     my $r_str_regx   = shift;
-    my $r_str_repl   = shift;
+    my $r_str_rpla   = shift;
     my $dot_p        = shift;
     my $case_p       = shift;
     my $ext_p        = shift;
@@ -62,9 +62,9 @@ sub process_replace {
     die $EVAL_ERROR if $EVAL_ERROR;
     
     my $interpolate_fn = ($eval_p
-                          ? eval_fn_gen($r_str_repl)
-                          : interpolate_fn_gen($r_str_repl));
-    die "Syntax error in replacement \"${$r_str_repl}\":\n${EVAL_ERROR}" if $EVAL_ERROR;
+                          ? eval_fn_gen($r_str_rpla)
+                          : interpolate_fn_gen($r_str_rpla));
+    die "Syntax error in replacement \"${$r_str_rpla}\":\n${EVAL_ERROR}" if $EVAL_ERROR;
     
     my $replace_fn = sub {
         my $rgn_beg = shift;
@@ -83,7 +83,7 @@ sub process_replace {
             $pos_wrap_end = $match_beg if ((not $wrap_p) && (not (defined $pos_wrap_end)));
             
             my $replacement = eval { $interpolate_fn->() };
-            die "Error while interpolating replacement \"${$r_str_repl}\":\n${EVAL_ERROR}" if $EVAL_ERROR;
+            die "Error while interpolating replacement \"${$r_str_rpla}\":\n${EVAL_ERROR}" if $EVAL_ERROR;
             
             escape_perl_str_for_emacs(\$replacement);
             
@@ -129,7 +129,7 @@ sub main () {
     my $fn_body   = shift @ARGV or die "No input file name!";
     my $fn_out    = shift @ARGV or die "No output file name!";
     my $fn_regx   = shift @ARGV or die "No regexp file name!";
-    my $fn_repl   = @ARGV ? shift @ARGV : die "No replacement file!";
+    my $fn_rpla   = @ARGV ? shift @ARGV : die "No replacement file!";
     my $dot_p     = @ARGV ? shift(@ARGV) : die "No dot matches new line flag.";
     my $case_p    = @ARGV ? shift(@ARGV) : die "No case sensitive flag.";
     my $ext_p     = @ARGV ? shift(@ARGV) : die "No extended regular expression flag.";
@@ -141,7 +141,7 @@ sub main () {
     
     my $code      = 'utf8';
     
-    my($str_body, $str_regx, $str_repl);
+    my($str_body, $str_regx, $str_rpla);
     
     use PerlIO::encoding;
     local $PerlIO::encoding::fallback = Encode::FB_CROAK(); # Die on invalid char.
@@ -149,13 +149,13 @@ sub main () {
         local $INPUT_RECORD_SEPARATOR = undef;
         $str_body = FileHandle->new($fn_body, "<:encoding($code)")->getline;
         $str_regx = FileHandle->new($fn_regx, "<:encoding($code)")->getline;
-        $str_repl = $fn_repl ? FileHandle->new($fn_repl, "<:encoding($code)")->getline : "";
+        $str_rpla = $fn_rpla ? FileHandle->new($fn_rpla, "<:encoding($code)")->getline : "";
     }
     
     umask 0177;
     *STDOUT = FileHandle->new($fn_out, ">:encoding($code)");
     
-    process_replace(\$str_body, \$str_regx, \$str_repl,
+    process_replace(\$str_body, \$str_regx, \$str_rpla,
                     $dot_p, $case_p, $ext_p, $eval_p,
                     length($limit) ? $limit : undef, $pos_start, $rgn_beg, $rgn_end);
     
