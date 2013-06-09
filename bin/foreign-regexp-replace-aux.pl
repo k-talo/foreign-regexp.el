@@ -28,7 +28,6 @@ sub eval_fn_gen {
 
 sub escape_str_for_interpolate_fn_gen {
     my $txt = shift;
-    $txt =~ s/\\/\\\\/og;
     $txt =~ s/"/\\"/og;
     $txt
 }

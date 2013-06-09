@@ -4,7 +4,7 @@
 abort "Ruby version is too old (1.9 or later is required)." if RUBY_VERSION < "1.9"
 
 def escape_str_for_interpolate_fn_gen (str)
-  str.gsub("\\"){"\\\\"}.gsub(/"/ ){'\\"'}
+  str.gsub(/"/ ){'\\"'}
 end
 
 def escape_ruby_str_for_emacs! (str)
