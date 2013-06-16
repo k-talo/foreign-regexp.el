@@ -916,12 +916,12 @@ supported by current foreign regexp."
   "On MS Windows, `call-process' won't run shell scripts properly.
 This is workaround for this behavior."
   (call-process "sh" ;; XXX: Shoud we use `shell-file-name'?
-		nil buffer nil "-c"
-		(apply #'concat
-		       (shell-quote-argument program) " "
-		       (mapcar #'(lambda (arg)
-                           (concat (shell-quote-argument arg) " "))
-			       args))))
+                nil buffer nil "-c"
+                (apply #'concat
+                       (shell-quote-argument program) " "
+                       (mapcar #'(lambda (arg)
+                                   (concat (shell-quote-argument arg) " "))
+                               args))))
 
 (defun foreign-regexp/run-external-command (cmd-path shell-script
                                                      body
@@ -982,8 +982,8 @@ NOTES FOR DEVELOPERS: Variables in REPLACEMENT should be interpolated
           
           ;; Do search by external command.
           (let ((status (apply (if (eq window-system 'w32)
-				   #'foreign-regexp/.w32-call-process
-				   #'call-process)
+                                   #'foreign-regexp/.w32-call-process
+                                 #'call-process)
                                `(,cmd-path
                                  nil ,(buffer-name proc-output-buf) nil
                                  ,@(if body (list fn-out-body) nil)
@@ -1881,7 +1881,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
          (stack nil)
          (replace-count 0)
          (multi-buffer nil)
-         (recenter-last-op nil)	; Start cycling order with initial position.
+         (recenter-last-op nil)      ; Start cycling order with initial position.
          
          (min nil)
          ;; If non-nil, it is marker saying where in the buffer to stop.
@@ -2152,7 +2152,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
                               ;;  current match start and end.  We could get this with a trivial
                               ;;  match like
                               ;;  (save-excursion (goto-char (match-beginning 0))
-                              ;;		     (search-forward (match-string 0))
+                              ;;                  (search-forward (match-string 0))
                               ;;                  (match-data t))
                               ;;  if we really wanted to avoid manually constructing match data.
                               ;;  Adding current-buffer is necessary so that match-data calls can
@@ -2760,7 +2760,7 @@ in BUF for REGEXP by external command."
                                       (+ offset elm))
                                   (car item))
                           parsed-result))))
-	  (setq parsed-result (reverse parsed-result))
+          (setq parsed-result (reverse parsed-result))
           
           ;; Remove old cache.
           (foreign-regexp/search/cache/clear buf regexp)
