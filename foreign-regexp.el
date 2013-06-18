@@ -50,8 +50,8 @@
 ;;              command.
 ;;
 ;;         (*2) External commands written in Perl (v5.8 or later
-;;              is required) and Ruby (v1.9 or later is required)
-;;              are pre-defined in this file.
+;;              is required), Ruby (v1.9 or later is required), and
+;;              JavaScript(node.js) are pre-defined in this file.
 ;;              To use regexp syntax of your choice, you can
 ;;              write your own external command.
 ;;
@@ -65,7 +65,7 @@
 ;; REQUIREMENTS
 ;; ============
 ;; By shell scripts defined in this file as default external commands,
-;; perl (>= 5.8) or ruby (>= 1.9) is required.
+;; perl (>= 5.8), ruby (>= 1.9) or node.js is required.
 ;;
 ;; Also features `cl', `menu-bar' and `re-builder' are required.
 ;;
@@ -93,13 +93,13 @@
 ;; FOREIGN REGEXP:
 ;;     A regular expression in syntax which is foreign to Emacs.
 ;;     Typically, it is not so much backslashy.
-;;     By default, Regular expressions in syntax of `Perl' and
-;;     `Ruby' can be used as FOREIGN REGEXP with this library.
+;;     By default, Regular expressions in syntax of `Perl', `Ruby' and
+;;     `JavaScript' can be used as FOREIGN REGEXP with this library.
 ;;
 ;; EXTERNAL COMMAND:
 ;;     An external program that gives Emacs the ability to handle
 ;;     FOREIGN REGEXP.
-;;     Commands written in `Perl' and `Ruby' are pre-defined in
+;;     Commands written in `Perl', `Ruby' and `JavaScript' are pre-defined in
 ;;     this library.
 ;;
 ;;
@@ -155,13 +155,36 @@
 ;;        method.
 ;;
 ;;
+;; [Example-3] Query Replace in manner of JavaScript.
+;;
+;;   STEP-1: Set regexp-type to JavaScript.
+;;
+;;        `M-x foreign-regexp/regexp-type/set <RET> javascript <RET>'
+;;
+;;   STEP-2: Run query replace 
+;;
+;;        `M-s M-% (\d+)---(\d+) <RET> $1456$2 <RET>'
+;;
+;;        This command replaces text in buffer:
+;;
+;;           123---789
+;;
+;;        with text:
+;;
+;;           123456789
+;;
+;;        Variables in replacement string are interpolated
+;;        as if they are in String.replace method.
+;;
+;;
 ;; COMMANDS(1): SETTING REGEXP-TYPE
 ;; ================================
 ;;
 ;;  `M-x foreign-regexp/regexp-type/set <RET> REGEXP-TYPE <RET>'
 ;;
 ;;      Set type of regexp syntax to REGEXP-TYPE.
-;;      By default, two regexp-types `perl' and `ruby' are provided.
+;;      By default, three regexp-types `perl', `ruby' and
+;;      `javascript' are provided.
 ;;
 ;;      You can also set REGEXP-TYPE via customization interface:
 ;;
@@ -225,7 +248,8 @@
 ;;       indicator which is put on the minibuffer prompt of each
 ;;       `foreign-regexp' command, or put on the mode-line of a
 ;;       buffer `*RE-Builder*'. The indicator will be displayed
-;;       like these: "[isx]" for perl, "[imx]" for ruby.
+;;       like these: `[isxe]' for Perl, `[imxe]' for Ruby and
+;;       `[ie]' for JavaScript.
 ;;       
 ;; `M-s M-i'
 ;; `M-x foreign-regexp/toggle-case-fold <RET>'
@@ -256,6 +280,11 @@
 ;;
 ;;        For `Ruby':
 ;;          `M-s M-% ^ <RET> $LINE||=0;sprintf('%05d: ', $LINE+=1) <RET>'
+;;
+;;        For `JavaScript':
+;;          `M-s M-% ^ <RET> function (m) {if(typeof(i)=='undefined'){i=0};return ('0000'+(++i)).substr(-5)+': '} <RET>'
+;;          (Replacement will be evaluated as a function in
+;;           `String.replace' method.)
 ;;
 ;;      put line number to beginning of each lines.
 ;;  
