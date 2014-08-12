@@ -1,0 +1,478 @@
+#+STARTUP: indent
+#+OPTIONS: num:nil toc:nil author:nil timestamp:nil
+
+# Copyright (C) 2010-2014 K-talo Miyazaki, all rights reserved.
+
+* foreign-regexp.el --- 他言語流の正規表現でで検索・置換を行う
+
+** 警告
+
+本ライブラリは実験的であるため、不具合が多発する可能性が
+ある。また本ライブラリは無保証で提供される。
+
+
+** 概要
+
+本ライブラリは、Emacs に他言語流の正規表現(以下、便宜のため
+外来正規表現と記述する)を扱う機能を提供する。
+
+具体的には、外来正規表現を使用可能な `isearch-forward-regexp'、
+`query-replace-regexp'、`occur' 等に相当するコマンドを提供する。
+
+現在のところ、Perl , Ruby, JavaScript の正規表現が
+外来正規表現として使用可能である。
+
+
+** 本ライブラリの仕組み
+
+本ライブラリは、以下の様に動作する:
+
+1. Emacs のユーザー・インターフェースで、外来正規表現による
+   検索・置換等を指示する。
+
+2. 外部コマンド(Perl, Ruby, JavaScript で実装)で検索・置換等
+   が実行される。
+
+3. Emacs のユーザー･インターフェースを通して、検索・置換等の
+   結果をバッファに適用する。
+
+
+** 要件
+
+動作環境として、UNIX 系 OS (*BSD/Linux/MacOSX)、あるいは
+Windows+Cygwin 上で動作する Emacs を想定している。
+
+外部コマンドとして、perl (5.8以上)、ruby (1.9 以上)、あるいは
+node (Node.js, JavaScript の正規表現を選択する場合) のいずれかを
+必要とする。
+
+また、 `cl'、'menu-bar'、`re-builder' の feature を必要とする。
+
+Emacs 21以上であれば、良い多言語サポートが期待できるはずである。
+
+- NOTE (Windows ユーザーのみ) ::
+  ウィルス対策ソフトが入っていると、各種 `foreign-regexp'
+  コマンドの動作が極端に遅くなる場合がある。その場合は、
+  ウィルス対策ソフトを無効にするか、 `foreign-regexp/tmp-dir' で
+  指定されるディレクトリを ウィルススキャンの対象から除外すると
+  動作が改善する可能性がある。
+
+
+** インストール
+
+本ライブラリをインストールするには、 =load-path= ( =C-h v load-path <RET>=
+で確認可能) で設定されたディレクトリにこのファイルを保存し、
+以下の内容を =.emacs= に追記する:
+
+#+BEGIN_EXAMPLE
+  (require 'foreign-regexp)
+  
+  (custom-set-variables
+  '(foreign-regexp/regexp-type 'perl) ;; お好みの外来正規表現を指定。
+                                      ;; ('perl, 'ruby 又は 'javascript)
+  '(reb-re-syntax 'foreign-regexp))   ;; re-builder で foreign-regexp を使用する。
+#+END_EXAMPLE
+
+
+** 使用例
+
+本使用例では、カレントバッファの内容が
+
+: 123---789
+
+と仮定する。
+
+*** [使用例-1] Perl の流儀で検索・置換を行う。
+
+**** (1) `foreign-regexp/regexp-type' に Perl を設定する.
+
+: M-x foreign-regexp/regexp-type/set <RET> perl <RET>
+
+- NOTE ::
+  本設定は、 Emacs 終了まで保持される。
+  Emacs セッションをまたいでの指定は、Customaize を通じて
+  行うことができる。 "コマンド (1) REGEXP-TYPE の設定" を
+  参照せよ。
+
+
+**** (2) 検索・置換を行う
+
+: M-s M-% (\d+)---(\d+) <RET> ${1}456${2} <RET>
+
+この操作はバッファ内の文字列
+
+: 123---789
+
+に対してマッチを発生させ、
+
+: 123456789
+
+で置換を行う。
+
+- NOTE ::
+置換文字列中の ${1} と ${2} は、Perl によって変数展開される。
+
+
+*** [使用例-2] Ruby の流儀で検索・置換を行う。
+
+****  (1) `foreign-regexp/regexp-type' に Ruby を設定する.
+
+: M-x foreign-regexp/regexp-type/set <RET> ruby <RET>
+
+**** (2) 検索・置換を行う
+
+: M-s M-% (\d+)---(\d+) <RET> #{$1}456#{$2} <RET>
+
+この操作はカレントバッファの文字列
+
+: 123---789
+
+に対してマッチを発生させ、
+
+: 123456789
+
+で置換を行う。
+
+- NOTE ::
+置換文字列中の #{$1} と #{$2} は、Ruby によって
+"gsub" ブロック中の文字列と同様に変数展開される。
+
+
+*** [使用例-3] JavaScript の流儀で検索・置換を行う。
+
+**** (1) `foreign-regexp/regexp-type' に JavaScript を設定する.
+
+: M-x foreign-regexp/regexp-type/set <RET> javascript <RET>
+
+**** (2) 検索・置換を行う
+
+: M-s M-% (\d+)---(\d+) <RET> $1456$2 <RET>
+
+この操作はバッファの文字列
+
+: 123---789
+
+に対してマッチを発生させ、
+
+: 123456789
+
+で置換を行う。
+
+(注) 置換文字列中の変数は `string.replace' メッソッド中の
+　　 文字列と同様に変数展開される。
+
+** コマンド
+
+*** (1) REGEXP-TYPE の設定
+
+: M-x foreign-regexp/regexp-type/set <RET> REGEXP-TYPE <RET>
+
+どの言語流の外来正規表現構文を使用するかを指定する。
+デフォルトの状態では、`perl'、`ruby'、`javascript' が
+選択可能となっている。
+
+カスタマイズを通じて REGEXP-TYPE を指定することも可能である。
+
+: M-x customize-apropos <RET> foreign-regexp/regexp-type <RET>
+
+
+*** (2) 検索・置換
+
+- NOTE ::
+  各種の `foreign-regexp' コマンドがミニバッファに
+  表示するプロンプト中では、編集内容を保ったまま、
+  他の `foreign-regexp' コマンドに移行可能となっている。
+
+: M-s M-o REGEXP <RET>
+: M-x foreign-regexp/occur <RET> REGEXP <RET>
+
+外来正規表現 REGEXP にマッチするものを持つ行を
+リスト表示する。
+
+: M-s M-% REGEXP <RET> REPLACEMENT <RET>
+: M-x foreign-regexp/query-replace <RET> REGEXP <RET> REPLACEMENT <RET>
+
+外来正規表現 REGEXP にマッチするもののいくつかを
+REPLACEMENT で置換する。
+
+REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
+
+: M-s M-s
+: M-x foreign-regexp/isearch-forward <RET>
+
+外来正規表現のインクリメンタル検索を開始する。
+
+: M-s M-r
+: M-x foreign-regexp/isearch-backward <RET> REGEXP
+
+外来正規表現の逆方向インクリメンタル検索を開始する。
+
+: M-s M-f REGEXP <RET>
+: M-x foreign-regexp/non-incremental/search-forward <RET> REGEXP <RET>
+
+外来正規表現 REGEXP を非インクリメンタル検索する。
+
+: M-s M-F REGEXP <RET>
+: M-x foreign-regexp/non-incremental/search-backward <RET> REGEXP <RET>
+
+外来正規表現 REGEXP を逆方向に非インクリメンタル検索する。
+
+: M-s M-g
+: M-x nonincremental-repeat-search-forward
+
+直前の文字列または正規表現で非インクリメンタル検索を行う。
+
+: M-s M-G
+: M-x nonincremental-repeat-search-backward
+
+直前の文字列または正規表現で逆方向に非インクリメンタル検索を行う。
+
+
+*** (3) 検索オプションの取り扱い
+
+- NOTE ::
+  検索オプションの状態は、各種の `foreign-regexp' コマンドが
+  ミニバッファに表示するプロンプト中の指示子によって明示される。
+  また、バッファ `*RE-Builder*' では、モードライン中に指示子が
+  表示される。
+  検索オプション指示子は、"[isxe]" (Perl向け)、"[imxe]" (Ruby向け)、
+  "[ie]" (JavaScript向け) という具合に表示される。
+  
+: M-s M-i
+: M-x foreign-regexp/toggle-case-fold <RET>
+
+
+検索オプション `case-fold-search' をトグル(ON/OFF切り替え)させる.
+
+: M-s M-m
+: M-x foreign-regexp/toggle-dot-match <RET>
+
+検索オプション `foreign-regexp/dot-match-a-newline-p' をトグルさせる.
+
+: M-s M-x
+: M-x foreign-regexp/toggle-ext-regexp <RET>
+
+検索オプション `foreign-regexp/use-extended-regexp-p' をトグルさせる.
+
+: M-s M-e
+: M-x foreign-regexp/toggle-eval-replacement <RET>
+
+検索オプション `foreign-regexp/toggle-eval-replacement' をトグルさせる.
+
+本検索オプションが ON のとき、コマンド `foreign-regexp/query-replace' の
+置換文字列は、式として評価される。
+
+例として、次のコマンドを見よ:
+  
+- Perl の場合: =M-s M-% ^ <RET> no strict 'vars';sprintf('%05d: ', ++$LINE) <RET>=
+
+- Ruby の場合: ~M-s M-% ^ <RET> $LINE||=0;sprintf('%05d: ', $LINE+=1) <RET>~
+  
+- JavaScript の場合: ~M-s M-% ^ <RET> function (m) {if(typeof(i)=='undefined'){i=0};return ('0000'+(++i)).substr(-5)+': '} <RET>~
+  (置換文字列は、`String.replace' に渡される関数の様に評価される)
+
+これらの例は、各行の行頭に行番号を挿入する。
+ 
+
+*** (4): RE-BUILDER による外来正規表現の作成
+
+: M-x reb-change-syntax <RET> foreign-regexp <RET>
+
+`re-builder' で外来正規表現を使用するよう指示する。
+
+: M-s M-l
+: M-x re-builder <RET>
+
+`re-builder' による対話的な外来正規表現の作成を開始する。
+(`re-builder' のドキュメントも参照せよ)
+
+- NOTE-1 ::
+  `re-builder' で作成した外来正規表現を各種の `foreign-regexp'
+  コマンドに適用するには、バッファ `*RE-Builder*' で以下の
+  コマンドを実行する:
+
+: M-s M-o
+: M-x foreign-regexp/re-builder/occur-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/occur' を
+実行する。
+
+: M-s M-%
+: M-x foreign-regexp/re-builder/query-replace-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/query-replace' を
+実行する。
+
+: M-s M-s
+: M-x foreign-regexp/re-builder/isearch-forward-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/isearch-forward' を
+実行する。
+
+: M-s M-r
+: M-x foreign-regexp/re-builder/isearch-backward-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/isearch-backward' を
+実行する。
+
+: M-s M-f
+: M-x foreign-regexp/re-builder/non-incremental-search-forward-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/non-incremental/search-forward' を
+実行する。
+
+: M-s M-F
+: M-x foreign-regexp/re-builder/non-incremental-search-backward-on-target-buffer
+
+バッファ `*RE-Builder*' 中の外来正規表現を使用し、
+バッファ `reb-target-buffer' に対して `foreign-regexp/non-incremental/search-backward' を
+実行する。
+
+
+- NOTE-2 ::
+  バッファ `reb-target-buffer' の検索オプションは、以下の
+  コマンドで切り替えることができる:
+
+: M-s M-i
+: M-x foreign-regexp/re-builder/toggle-case-fold-on-target-buffer
+
+バッファ `reb-target-buffer' の検索オプション `case-fold-search' を
+トグルさせる。
+
+: M-s M-m
+: M-x foreign-regexp/re-builder/toggle-dot-match-on-target-buffer
+
+バッファ `reb-target-buffer' の検索オプション `foreign-regexp/dot-match-a-newline-p' を
+トグルさせる。
+
+: M-s M-x
+: M-x foreign-regexp/re-builder/toggle-ext-regexp-on-target-buffer
+
+バッファ `reb-target-buffer' の検索オプション `foreign-regexp/dot-match-a-newline-p' を
+トグルさせる。
+
+: M-\
+: M-x foreign-regexp/quote-meta-in-region <RET>
+
+外来正規表現中で特別な意味を持つ文字をエスケープする。
+
+
+*** (5) 外来正規表現を使用した文字揃え
+
+: C-M-|
+: M-x align
+
+事前に定義された文字揃えルールを用いてリージョンの
+文字揃えを行う。
+
+文字揃えルール中で外来正規表現を使用するためには、
+属性 `regexp-type' を記述すればよい。
+
+例)
+#+BEGIN_EXAMPLE
+  (add-to-list
+   'align-rules-list
+   '(perl-and-ruby-hash-form
+    
+     ;; 本ルールは `regexp-type' が `perl' または
+     ;; `ruby' である場合に適用される。
+     (regexp-type . '(perl ruby))
+    
+     (regexp . "([ \\t]*)=>[ \\t]*[^# \\t\\n]") ;; 外来正規表現
+     (group  . 1)
+     (repeat . t)
+     (modes  . '(perl-mode cperl-mode ruby-mode))))
+#+END_EXAMPLE
+
+文字揃えルールについてのさらなる情報については、`align-rules-list'、
+`align-region' のヘルプドキュメントを見よ。
+
+: M-s M-a REGEXP <RET>
+: M-x foreign-regexp/align <RET> REGEXP <RET>
+
+ミニバッファに入力された外来正規表現 REGEXP に基づいた
+リージョンの文字揃えを行う。
+
+入力された外来正規表現は、空白文字に続いて
+マッチするものと仮定されます。
+
+コマンド `align-regexp' も参照せよ。
+
+: C-u M-s M-a REGEXP <RET> GROUP <RET> SPACING <RET> REPEAT <RET>
+: C-u M-x foreign-regexp/align <RET> REGEXP <RET> GROUP <RET> SPACING <RET> REPEAT <RET>
+
+ミニバッファに入力された一時ルールに基づいたリージョンの
+文字揃えを行う。
+
+例)
+  < 本例では perl 形式の外来正規表現を使用する >
+
+#+BEGIN_EXAMPLE
+  リージョンの内容が以下の内容であるとき:
+  
+       (one 1)
+       (ten 10)
+       (hundred 100)
+       (thousand 1000)
+  
+  コマンド `foreign-regexp/align' を以下のオプションで
+  実行する:
+  
+       REGEXP: ([ \t]+)\d
+                    |
+                    +--- GROUP: 1
+                         文字揃えは、キャプチャグループ 1 が
+                         マッチした各行の場所に空白文字を
+                         挿入するすることで行われる。
+       SPACING: 1
+       REPEAT:  y
+  
+  結果は以下の通りである:
+  
+       (one      1)
+       (ten      10)
+       (hundred  100)
+       (thousand 1000)
+                |
+                +---- SPACING で指定した幅で文字揃えが行われた。
+#+END_EXAMPLE
+コマンド `align-regexp' も参照せよ。
+
+
+** プログラマーの方へ
+
+以下の４つのコマンド:
+ 
+`foreign-regexp/replace/external-command'
+`foreign-regexp/occur/external-command'
+`foreign-regexp/search/external-command'
+`foreign-regexp/quote-meta/external-command'
+
+を、あなたのお好みの言語で作成し、これらのコマンドを関数
+`foreign-regexp/regexp-type/define' で組み込む事により、
+その言語の正規表現を使えるようになるかもしれない。
+
+更なる情報については、これらの変数・関数の
+ヘルプドキュメントを参照せよ。
+
+
+** 既知の不具合
+ 
+ - ドキュメントの内容については再考の余地がある。
+   (特に英語版については)
+
+** WISH LIST
+ - History for `re-builder'.
+ - `grep' with foreign regexp?
+ - `tags-search', `tags-query-replace', `dried-do-search' and
+   `dired-do-query-replace-regexp' with foreign regexp?
+ - `multi-isearch-buffers-regexp', `multi-occur',
+   `multi-occur-in-matching-buffers', `how-many', `flush-lines',
+   and `keep-lines' with foreign regexp?
+ - Better error messages.
+ - Write Tests.
