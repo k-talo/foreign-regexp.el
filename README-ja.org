@@ -3,7 +3,7 @@
 
 # Copyright (C) 2010-2014 K-talo Miyazaki, all rights reserved.
 
-* foreign-regexp.el --- 他言語流の正規表現でで検索・置換を行う
+* foreign-regexp.el --- 他言語流の正規表現で検索・置換を行う
 
 ** 警告
 
@@ -51,7 +51,7 @@ node (Node.js, JavaScript の正規表現を選択する場合) のいずれか�
 Emacs 21以上であれば、良い多言語サポートが期待できるはずである。
 
 - NOTE (Windows ユーザーのみ) ::
-  ウィルス対策ソフトが入っていると、各種 `foreign-regexp'
+  ウィルス対策ソフトが導入されている環境で、各種 `foreign-regexp'
   コマンドの動作が極端に遅くなる場合がある。その場合は、
   ウィルス対策ソフトを無効にするか、 `foreign-regexp/tmp-dir' で
   指定されるディレクトリを ウィルススキャンの対象から除外すると
@@ -61,7 +61,7 @@ Emacs 21以上であれば、良い多言語サポートが期待できるはず
 ** インストール
 
 本ライブラリをインストールするには、 =load-path= ( =C-h v load-path <RET>=
-で確認可能) で設定されたディレクトリにこのファイルを保存し、
+で確認可能) で設定されたディレクトリにファイル "foreign-regexp.el" を保存し、
 以下の内容を =.emacs= に追記する:
 
 #+BEGIN_EXAMPLE
@@ -158,8 +158,9 @@ Emacs 21以上であれば、良い多言語サポートが期待できるはず
 
 で置換を行う。
 
-(注) 置換文字列中の変数は `string.replace' メッソッド中の
-　　 文字列と同様に変数展開される。
+- NOTE ::
+置換文字列中の変数は `string.replace' メッソッド中の
+文字列と同様に変数展開される。
 
 ** コマンド
 
@@ -260,7 +261,7 @@ REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
 検索オプション `foreign-regexp/toggle-eval-replacement' をトグルさせる.
 
 本検索オプションが ON のとき、コマンド `foreign-regexp/query-replace' の
-置換文字列は、式として評価される。
+置換文字列は式として評価される。
 
 例として、次のコマンドを見よ:
   

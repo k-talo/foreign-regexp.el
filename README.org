@@ -64,8 +64,8 @@ For better multilingual support, Emacs (>= 21) may be required.
 
 
 ** INSTALLING
-To install this library, save this file to a directory in your
-=load-path= (you can view the current =load-path= using
+To install this library, save the file "foreign-regexp.el" to a directory
+in your =load-path= (you can view the current =load-path= using
 =C-h v load-path <RET>= within Emacs), then add following
 lines to your =.emacs=:
 
