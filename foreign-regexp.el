@@ -4671,7 +4671,7 @@ main
 
 ")
 
-(defvar foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.js "#!/usr/bin/env /node
+(defvar foreign-regexp/shell-script/foreign-regexp-quote-meta-aux.js "#!/usr/bin/env node
 // -*- coding: utf-8-unix -*-
 
 const ENCODING = 'utf8';

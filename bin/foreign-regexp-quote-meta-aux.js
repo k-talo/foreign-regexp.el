@@ -1,4 +1,4 @@
-#!/usr/bin/env /node
+#!/usr/bin/env node
 // -*- coding: utf-8-unix -*-
 
 const ENCODING = 'utf8';
