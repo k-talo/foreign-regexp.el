@@ -6,7 +6,7 @@
 ;; Created: Sun Nov 28 23:50:45 2010 JST
 ;; Keywords: convenience emulations matching tools unix wp
 ;; Revision: $Id$
-;; Version: 1.0
+;; Version: 1.1.0
 ;; URL: 
 ;; GitHub: http://github.com/k-talo/foreign-regexp.el
 
@@ -158,8 +158,8 @@
 ;;           123456789
 ;;
 ;;        Variables in replacement string are interpolated by ruby
-;;        as if they are in the string inside of a block of "gsub"
-;;        method.
+;;        as if they are in the replacement string inside of the
+;;        `String#gsub' method.
 ;;
 ;;
 ;; [Example-3] Query Replace in manner of JavaScript.
@@ -181,7 +181,7 @@
 ;;           123456789
 ;;
 ;;        Variables in replacement string are interpolated
-;;        as if they are in String.replace method.
+;;        as if they are in `String.prototype.replace' method.
 ;;
 ;;
 ;; COMMANDS(1): SETTING REGEXP-TYPE
@@ -285,14 +285,31 @@
 ;;
 ;;        For `Perl':
 ;;          `M-s M-% ^ <RET> no strict 'vars';sprintf('%05d: ', ++$LINE) <RET>'
+;;            NOTE:
+;;              Replacement will be evaluated like REPLACEMENT in replacement
+;;              operator with `e' option (like: `s/pattern/REPLACEMENT/e').
+;;              In the replacement string, you can refer to special variables
+;;              `$&', `$1', `&2', ... and so on.
 ;;
 ;;        For `Ruby':
 ;;          `M-s M-% ^ <RET> { $LINE||=0;sprintf('%05d: ', $LINE+=1) } <RET>'
+;;            NOTE:
+;;              Replacement will be evaluated like a block passed to
+;;              `String#gsub' method.
+;;              In the block form, the current match string is passed as a
+;;              parameter, and you can refer to built-in variables `$&', `$1',
+;;              `&2', ... and so on.
 ;;
 ;;        For `JavaScript':
 ;;          `M-s M-% ^ <RET> function (m) {if(typeof(i)=='undefined'){i=0};return ('0000'+(++i)).substr(-5)+': '} <RET>'
-;;          (Replacement will be evaluated as a function in
-;;           `String.replace' method.)
+;;            NOTE:
+;;              Replacement will be evaluated like a function in the 2nd
+;;              argument of the method =String.prototype.replace=.
+;;              In the function, the current match string, captured strings
+;;              (1 .. nth, if exits), the position where the match occurred, and
+;;              the strings to be searched are passed as arguments, and you can
+;;              refer to properties `RegExp.lastMatch', `RegExp.$1', ... and
+;;              so on.
 ;;
 ;;      put line number to beginning of each lines.
 ;;
