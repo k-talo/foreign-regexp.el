@@ -166,7 +166,7 @@ as if they are in =String.prototype.replace= method.
 
 **** STEP-2: Run query replace
 
-:M-s M-% (\d+)---(\d+) <RET> \g<1>456\g<2> <RET>
+: M-s M-% (\d+)---(\d+) <RET> \g<1>456\g<2> <RET>
 
 This command replaces text in buffer:
 
@@ -307,7 +307,7 @@ as expression. For example, these commands:
     You can specify a function which takes match object as argument and returns
     replacement string, by =lambda= expression or =def= statement.
     And you can refer match and sub groups through match object,
-    for example: `lambda m: m.group(0)'.
+    for example: =lambda m: m.group(0)=.
     
     When you specify a function by =def= statement, you can use arbitrary
     function name and you can put statements around the function.
