@@ -5211,7 +5211,7 @@ function process_replace (str_body, str_regx, str_rpla,
             }
 
             try {
-                replacement = interpolate_fn.apply(this, match);
+                replacement = interpolate_fn.apply(this, match.concat([match_beg, str_body]));
             } catch (e) {
                 throw {message: 'Error while interpolating replacement \"'+str_rpla+'\":\\n'+e.message};
             }
