@@ -23,8 +23,8 @@ In particular, this library provides features corresponds to
 such as `isearch-forward-regexp', `query-replace-regexp' and
 `occur'.
 
-Currently, regular expressions of Perl, Ruby and JavaScript
-can be used as foreign regexp.
+Currently, regular expressions of Perl, Ruby, JavaScript and
+Python can be used as foreign regexp.
 
 
 ** THE GUTS OF THIS LIBRARY
@@ -35,8 +35,8 @@ This library works like below:
    through the user-interface of Emacs.
 
 2. A search/replace operation will be executed by external
-   commands (they are implemented in Perl, Ruby or
-   JavaScript).
+   commands (they are implemented in Perl, Ruby, JavaScript
+   or Python).
 
 3. Apply the result of search/replace operations to the buffer
    through the user-interface of Emacs.
@@ -47,8 +47,9 @@ This library works like below:
 You need to have an Emacs which running on UNIX-like operating
 system (*BSD/Linux/MacOSX) or Windows+Cygwin.
 
-perl (>= 5.8), ruby (>= 1.9) or node (Node.js, for JavaScript),
-choose one of them as your taste, is required as external command.
+perl (>= 5.8), ruby (>= 1.9) node (Node.js, for JavaScript) or
+python (only tested on 2.x), choose one of them as your taste,
+is required as external command.
 
 Also features `cl', `menu-bar' and `re-builder' are required.
 
@@ -156,6 +157,27 @@ with text:
 
 Variables in replacement string are interpolated
 as if they are in =String.prototype.replace= method.
+
+*** [Example-4] Query Replace in manner of Python.
+
+**** STEP-1: Set regexp-type to Python.
+
+: M-x foreign-regexp/regexp-type/set <RET> python <RET>
+
+**** STEP-2: Run query replace
+
+:M-s M-% (\d+)---(\d+) <RET> \g<1>456\g<2> <RET>
+
+This command replaces text in buffer:
+
+: 123---789
+
+with text:
+
+: 123456789
+
+Backreferences in replacement string are interpolated
+as if they are in `re.sub' method.
 
 
 ** COMMANDS
@@ -279,6 +301,28 @@ as expression. For example, these commands:
     the position where the match occurred, and the strings to be searched is passed
     as a argument, and you can refer to properties =RegExp.lastMatch=, =RegExp.$1=,
     ... and so on.
+
+- For `Python': ~M-s M-% ^ <RET> i = 0 C-q C-j def f (m): C-q C-j <SPC> global i C-q C-j <SPC> i=i+1 C-q C-j <SPC> return '%05d: ' % i <RET>~
+  - NOTE ::
+    You can specify a function which takes match object as argument and returns
+    replacement string, by =lambda= expression or =def= statement.
+    And you can refer match and sub groups through match object,
+    for example: `lambda m: m.group(0)'.
+    
+    When you specify a function by =def= statement, you can use arbitrary
+    function name and you can put statements around the function.
+    In this case, the first =def= statement will be called for each matches,
+    and the other statements will be called only once before search/replacement
+    operation has began.
+    
+    The first implementation of this library accepts only =lambda= expression
+    as the replacement.
+    Because of inconvenience of =lambda= expression, that it does not accept
+    any statement like assignment operation, so we make this library to accept
+    =def= statement.
+    Additionally, we can't assign to uninitialized global variable in function
+    defined by =def= statement, so we make it to accept statements around the
+    =def= statement which can initialize global variables, for our convenience.
 
 put line number to beginning of each lines.
  

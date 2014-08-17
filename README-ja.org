@@ -19,7 +19,7 @@
 具体的には、外来正規表現を使用可能な `isearch-forward-regexp'、
 `query-replace-regexp'、`occur' 等に相当するコマンドを提供する。
 
-現在のところ、Perl , Ruby, JavaScript の正規表現が
+現在のところ、Perl , Ruby, JavaScript, Python の正規表現が
 外来正規表現として使用可能である。
 
 
@@ -42,9 +42,9 @@
 動作環境として、UNIX 系 OS (*BSD/Linux/MacOSX)、あるいは
 Windows+Cygwin 上で動作する Emacs を想定している。
 
-外部コマンドとして、perl (5.8以上)、ruby (1.9 以上)、あるいは
-node (Node.js, JavaScript の正規表現を選択する場合) のいずれかを
-必要とする。
+外部コマンドとして、perl (5.8以上)、ruby (1.9 以上)、
+node (Node.js, JavaScript の正規表現を選択する場合) あるいは
+Python (2.x系でのみ動作を確認済) のいずれかを必要とする。
 
 また、 `cl'、'menu-bar'、`re-builder' の feature を必要とする。
 
@@ -162,6 +162,31 @@ Emacs 21以上であれば、良い多言語サポートが期待できるはず
 置換文字列中の変数は =String.prototype.replace= メッソッド中の
 文字列と同様に変数展開される。
 
+*** [使用例-4] Python の流儀で検索・置換を行う。
+
+**** (1) `foreign-regexp/regexp-type' に Python を設定する.
+
+: M-x foreign-regexp/regexp-type/set <RET> python <RET>
+
+**** (2) 検索・置換を行う
+
+: `M-s M-% (\d+)---(\d+) <RET> \g<1>456\g<2> <RET>'
+
+この操作はバッファの文字列
+
+: 123---789
+
+に対してマッチを発生させ、
+
+: 123456789
+
+で置換を行う。
+
+- NOTE ::
+置換文字列中の後方参照は =re.sub= メッソッド中の
+置換文字列と同様に展開される。
+
+
 ** コマンド
 
 *** (1) REGEXP-TYPE の設定
@@ -169,7 +194,7 @@ Emacs 21以上であれば、良い多言語サポートが期待できるはず
 : M-x foreign-regexp/regexp-type/set <RET> REGEXP-TYPE <RET>
 
 どの言語流の外来正規表現構文を使用するかを指定する。
-デフォルトの状態では、`perl'、`ruby'、`javascript' が
+デフォルトの状態では、`perl'、`ruby'、`javascript'、`python' が
 選択可能となっている。
 
 カスタマイズを通じて REGEXP-TYPE を指定することも可能である。
@@ -237,7 +262,7 @@ REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
   また、バッファ `*RE-Builder*' では、モードライン中に指示子が
   表示される。
   検索オプション指示子は、"[isxe]" (Perl向け)、"[imxe]" (Ruby向け)、
-  "[ie]" (JavaScript向け) という具合に表示される。
+  "[ie]" (JavaScript向け)、"[ISXe]" (Python向け) という具合に表示される。
   
 : M-s M-i
 : M-x foreign-regexp/toggle-case-fold <RET>
@@ -285,6 +310,21 @@ REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
     存在する場合)、 マッチ開始位置、検索対象文字列が引数として渡される。
     また、関数中では、 =RegExp.lastMatch=, =RegExp.$1=, ...等のプロパティを参照する
     ことが可能である。
+    
+- Python の場合: ~M-s M-% ^ <RET> i = 0 C-q C-j def f (m): C-q C-j <SPC> global i C-q C-j <SPC> i=i+1 C-q C-j <SPC> return '%05d: ' % i <RET>~
+  - NOTE ::
+    マッチオブジェクトを引数に取り、置換文字列を返す関数を =lambda= 式あるいは =def= 文で指定ことができる。
+    関数中では、マッチオブジェクトを介してマッチあるいはサブグループを参照できる。
+    
+    (例) =lambda m: m.group(0)=
+    
+    def 文で関数を指定する場合、関数名は任意のものを指定でき、def 文の前後には任意の文を置くことができる。
+    はじめに現れた def 文のみが各マッチ毎に実行され、その他の文は置換処理開始前に一度だけ実行される。
+    
+    当初、本ライブラリの実装では =String.sub= メソッド同様、 =lambda= 式のみ受け付け仕様であったが、
+    =lambda= 式中では文が書けず変数への代入ができない等の不自由が多いため、 =def= 文も受け付ける
+　　仕様にした。また、 =def= 文で定義した関数中では未初期化のグローバル変数への代入ができないため、
+　　変数等初期化のための文を前後に記述できる仕様とし便宜を図っている。
 
 
 これらの例は、各行の行頭に行番号を挿入する。
