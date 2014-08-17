@@ -23,9 +23,9 @@ def process_replace (__str_body__, __str_regx__, __str_rpla__,
                                        (__ext_p__  ? Regexp::EXTENDED  : 0)))
   __interpolate_fn__ = begin
                          (__eval_p__ ?
-                          eval('Proc.new {'+__str_rpla__+'}') :
+                          eval('Proc.new '+__str_rpla__) :
                           eval('Proc.new {"'+escape_str_for_interpolate_fn_gen(__str_rpla__)+'"}'))
-                       rescue SyntaxError
+                       rescue SyntaxError, ArgumentError
                          $stderr.print "Syntax error in replacement \"#{__str_rpla__}\".\n"
                          $stderr.print $!.message
                          exit! 1
@@ -39,7 +39,7 @@ def process_replace (__str_body__, __str_regx__, __str_rpla__,
       m = Regexp.last_match
       
       __match_beg__ = m.begin(0)
-      __match_end__ = m.end  (0)
+      __match_end__ = m.end(0)
       __0_width_p__ = (__match_beg__ == __match_end__)
       
       break if ((__match_beg__ > __rgn_end__) || (__match_end__ > __rgn_end__))
@@ -58,7 +58,7 @@ def process_replace (__str_body__, __str_regx__, __str_rpla__,
       end
       
       __replacement__ = begin
-                          __interpolate_fn__.call(m).to_s
+                          __interpolate_fn__.call(m[0]).to_s
                         rescue Exception
                           $stderr.print "Error while evaluating replacement \"#{__str_rpla__}\".\n"
                           $stderr.print $!.message, "\n"
