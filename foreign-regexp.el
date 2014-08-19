@@ -5417,7 +5417,7 @@ def interpolate_fn_gn (txt):
     
     try:
         exec(txt, {}, env)
-    except Exception, e:
+    except Exception as e:
         sys.stderr.write(\"Error in replacement string: \")
         sys.stderr.write(str(e))
         exit(1)
@@ -5471,7 +5471,7 @@ def do_replace (f, str_body, regx, str_rpla, interpolate_fn, limit, rgn_beg, rgn
                 rpla_expanded = str(rpla_expanded)
             
             f.write(escape_python_str_for_emacs(rpla_expanded))
-        except Exception, e:
+        except Exception as e:
             sys.stderr.write(\"Error while interpolating replacement: \")
             sys.stderr.write(str(e))
             exit(1)
@@ -5503,7 +5503,7 @@ def main ():
                                      ((not case_p) and re.IGNORECASE or 0) |
                                      (ext_p        and re.VERBOSE    or 0) |
                                      re.MULTILINE)) # XXX: Put re.UNICODE flag?
-    except Exception, e:
+    except Exception as e:
         sys.stderr.write(\"Error while compiling regexp: \")
         sys.stderr.write(str(e))
         exit(1)
