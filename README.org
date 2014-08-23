@@ -274,7 +274,7 @@ Toggle search option `foreign-regexp/use-extended-regexp-p'.
 : M-s M-e
 : M-x foreign-regexp/toggle-eval-replacement <RET>
 
-Toggle search option `foreign-regexp/toggle-eval-replacement'.
+Toggle search option `foreign-regexp/eval-replacement-p'.
 
 When this search option is on, the replacement string for
 a command `foreign-regexp/query-replace' will be evaluated
@@ -400,8 +400,8 @@ of `reb-target-buffer'.
 : M-s M-x
 : M-x foreign-regexp/re-builder/toggle-ext-regexp-on-target-buffer
 
-Toggle search option `foreign-regexp/dot-match-a-newline-p'
-of `foreign-regexp/use-extended-regexp-p'.
+Toggle search option `foreign-regexp/use-extended-regexp-p'
+of `reb-target-buffer'.
 
 : M-\
 : M-x foreign-regexp/quote-meta-in-region <RET>

@@ -283,7 +283,7 @@ REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
 : M-s M-e
 : M-x foreign-regexp/toggle-eval-replacement <RET>
 
-検索オプション `foreign-regexp/toggle-eval-replacement' をトグルさせる.
+検索オプション `foreign-regexp/eval-replacement-p' をトグルさせる.
 
 本検索オプションが ON のとき、コマンド `foreign-regexp/query-replace' の
 置換文字列は式として評価される。
@@ -409,7 +409,7 @@ REPLACEMENT の表記法は、 REGEXP-TYPE により異なる。
 : M-s M-x
 : M-x foreign-regexp/re-builder/toggle-ext-regexp-on-target-buffer
 
-バッファ `reb-target-buffer' の検索オプション `foreign-regexp/dot-match-a-newline-p' を
+バッファ `reb-target-buffer' の検索オプション `foreign-regexp/use-extended-regexp-p' を
 トグルさせる。
 
 : M-\
