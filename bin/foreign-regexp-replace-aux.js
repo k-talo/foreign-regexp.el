@@ -50,7 +50,7 @@ function interpolate_fn_gen (str, num_capture) {
         var expr;
 
         if (peek == '$') {
-            rpla_lst.push(quote_str_for_eval('$$'));
+            rpla_lst.push(quote_str_for_eval('$'));
             pos += 2;
         } else if (peek == "&") {
             expr = 'RegExp.lastMatch';
