@@ -77,7 +77,7 @@ sub process_replace {
             my $match_beg = $LAST_MATCH_START[0];
             my $match_end = $LAST_MATCH_END  [0];
             
-            last if (($match_beg > $rgn_end) || ($match_end > $rgn_end));
+            last if ($match_end > $rgn_end);
             last if ($wrap_p && (defined $pos_wrap_end) && ($pos_wrap_end <= $match_beg));
             $pos_wrap_end = $match_beg if ((not $wrap_p) && (not (defined $pos_wrap_end)));
             

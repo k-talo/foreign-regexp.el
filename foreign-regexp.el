@@ -4901,7 +4901,7 @@ sub process_replace {
             my $match_beg = $LAST_MATCH_START[0];
             my $match_end = $LAST_MATCH_END  [0];
             
-            last if (($match_beg > $rgn_end) || ($match_end > $rgn_end));
+            last if ($match_end > $rgn_end);
             last if ($wrap_p && (defined $pos_wrap_end) && ($pos_wrap_end <= $match_beg));
             $pos_wrap_end = $match_beg if ((not $wrap_p) && (not (defined $pos_wrap_end)));
             
@@ -5035,7 +5035,7 @@ def process_replace (__str_body__, __str_regx__, __str_rpla__,
       __match_end__ = m.end(0)
       __0_width_p__ = (__match_beg__ == __match_end__)
       
-      break if ((__match_beg__ > __rgn_end__) || (__match_end__ > __rgn_end__))
+      break if (__match_end__ > __rgn_end__)
       break if (__wrap_p__ && __pos_wrap_end__ && (__pos_wrap_end__ <= __match_beg__))
       __pos_wrap_end__ = __match_beg__ if ((not __wrap_p__) && (not __pos_wrap_end__))
       
@@ -5292,7 +5292,7 @@ function process_replace (str_body, str_regx, str_rpla,
             var match_end = lmi[offset + 1];
             var _0_width_p = (match_beg == match_end);
             
-            if ((match_beg > rgn_end) || (match_end > rgn_end)) { break };
+            if (match_end > rgn_end) { break };
             if (wrap_p && (pos_wrap_end != null) && (pos_wrap_end <= match_beg)) { break };
             if ((! wrap_p) && (pos_wrap_end == null))  { pos_wrap_end = match_beg };
             

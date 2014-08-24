@@ -42,7 +42,7 @@ def process_replace (__str_body__, __str_regx__, __str_rpla__,
       __match_end__ = m.end(0)
       __0_width_p__ = (__match_beg__ == __match_end__)
       
-      break if ((__match_beg__ > __rgn_end__) || (__match_end__ > __rgn_end__))
+      break if (__match_end__ > __rgn_end__)
       break if (__wrap_p__ && __pos_wrap_end__ && (__pos_wrap_end__ <= __match_beg__))
       __pos_wrap_end__ = __match_beg__ if ((not __wrap_p__) && (not __pos_wrap_end__))
       

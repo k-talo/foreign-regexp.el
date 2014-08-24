@@ -153,7 +153,7 @@ function process_replace (str_body, str_regx, str_rpla,
             var match_end = lmi[offset + 1];
             var _0_width_p = (match_beg == match_end);
             
-            if ((match_beg > rgn_end) || (match_end > rgn_end)) { break };
+            if (match_end > rgn_end) { break };
             if (wrap_p && (pos_wrap_end != null) && (pos_wrap_end <= match_beg)) { break };
             if ((! wrap_p) && (pos_wrap_end == null))  { pos_wrap_end = match_beg };
             
