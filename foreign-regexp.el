@@ -4156,11 +4156,7 @@ transition to another foreign-regexp command."
                     (add-hook 'isearch-mode-end-hook (quote ,fn-name-turn-off-transition))))))
               
               ((minibuf-cmd)
-               (let ((orig-command                (intern
-                                                   (format
-                                                    "ad-Orig-%s"
-                                                    command)))
-                     (ad-name-catch-transition-to (intern
+               (let ((ad-name-catch-transition-to (intern
                                                    (format
                                                     "foreign-regexp/transition/%s/catch-transition-to-%s"
                                                     label targ-label)))
@@ -4207,13 +4203,12 @@ And remember running command to prevent duplicate calls."
                                       ;; Remember current command to
                                       ;; prevent duplicate calls.
                                       (setq foreign-regexp/transition/.running-cmd this-command)
-                                      
                                       (setq ad-return-value
-                                            (call-interactively (quote ,orig-command))))
+                                            (call-interactively (ad-get-orig-definition (quote ,command)))))
                                   (setq foreign-regexp/transition/.running-cmd nil))
                               ;; Called non-interactively.
                               (setq ad-return-value
-                                    (apply (quote ,orig-command) args))))
+                                    (apply (ad-get-orig-definition (quote ,command)) args))))
                           (foreign-regexp/ad-activate (quote ,command))))
                  (nconc
                   retval
