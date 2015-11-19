@@ -5598,7 +5598,7 @@ main()
  :indicator-separator            "")
 
 (foreign-regexp/regexp-type/define
- :name 'javascript
+ :name 'python
  :tag "Python"
  :input-coding-system           'utf-8-unix
  :output-coding-system          'utf-8-unix
