@@ -5132,7 +5132,7 @@ main()
                 (t
                  (or (foreign-regexp/which "node")
                      "node")))
-          " --expose_natives_as=NATIVES
+          "
 // -*- coding: utf-8-unix -*-
 
 const ENCODING = 'utf8';
@@ -5225,6 +5225,21 @@ function interpolate_fn_gen (str, num_capture) {
     return eval('(function ('+arg_lst.join(',')+'){return '+rpla_lst.join('+')+'})');
 }
 
+function get_match_pos (regx, match, str_body) {
+    var rt = [];
+    if (match) {
+        rt.push(regx.lastIndex - match[0].length);
+        rt.push(regx.lastIndex);
+        for (var i = 1, start; i < match.length; i++) {
+            start = str_body.indexOf(match[i], rt[0]);
+            rt.push(start);
+            rt.push(start + match[i].length);
+        }
+    }
+    return rt;
+}
+
+
 function process_replace (str_body, str_regx, str_rpla,
                           dot_p, case_p, ext_p, eval_p,
                           limit, pos_start, rgn_beg, rgn_end,
@@ -5266,22 +5281,11 @@ function process_replace (str_body, str_regx, str_rpla,
         while (((limit == null) ? true : (count < limit))
                && ((regx.lastIndex = cur_pos) ? true : true)
                && (match = regx.exec(str_body))) {
-            
-            var lmi = NATIVES.lastMatchInfo;
-            
-            // NOTE: lastMatchInfo seems to be broken when
-            //       some I/O operations has been run.
-            //       (I dunno why this happens...)
-            //       So I save the original values of lastMatchInfo.
-            var tmp = [];
-            var lmi_len = lmi.length;
-            for (var i = 0; i < lmi_len; ++i) {
-                tmp[i] = lmi[i];
-            }
-            lmi = tmp;
-            
+
+            var lmi = get_match_pos(regx, match, str_body);
+
             var num_capture = match.length - 1;
-            var offset = 3; // from `macro CAPTURE(index)' in macros.py
+            var offset = 0;
             
             var match_beg = lmi[offset + 0];
             var match_end = lmi[offset + 1];
