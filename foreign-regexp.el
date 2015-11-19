@@ -4156,11 +4156,7 @@ transition to another foreign-regexp command."
                     (add-hook 'isearch-mode-end-hook (quote ,fn-name-turn-off-transition))))))
               
               ((minibuf-cmd)
-               (let ((orig-command                (intern
-                                                   (format
-                                                    "ad-Orig-%s"
-                                                    command)))
-                     (ad-name-catch-transition-to (intern
+               (let ((ad-name-catch-transition-to (intern
                                                    (format
                                                     "foreign-regexp/transition/%s/catch-transition-to-%s"
                                                     label targ-label)))
@@ -4207,13 +4203,12 @@ And remember running command to prevent duplicate calls."
                                       ;; Remember current command to
                                       ;; prevent duplicate calls.
                                       (setq foreign-regexp/transition/.running-cmd this-command)
-                                      
                                       (setq ad-return-value
-                                            (call-interactively (quote ,orig-command))))
+                                            (call-interactively (ad-get-orig-definition (quote ,command)))))
                                   (setq foreign-regexp/transition/.running-cmd nil))
                               ;; Called non-interactively.
                               (setq ad-return-value
-                                    (apply (quote ,orig-command) args))))
+                                    (apply (ad-get-orig-definition (quote ,command)) args))))
                           (foreign-regexp/ad-activate (quote ,command))))
                  (nconc
                   retval
@@ -5137,7 +5132,7 @@ main()
                 (t
                  (or (foreign-regexp/which "node")
                      "node")))
-          " --expose_natives_as=NATIVES
+          "
 // -*- coding: utf-8-unix -*-
 
 const ENCODING = 'utf8';
@@ -5230,6 +5225,21 @@ function interpolate_fn_gen (str, num_capture) {
     return eval('(function ('+arg_lst.join(',')+'){return '+rpla_lst.join('+')+'})');
 }
 
+function get_match_pos (regx, match, str_body) {
+    var rt = [];
+    if (match) {
+        rt.push(regx.lastIndex - match[0].length);
+        rt.push(regx.lastIndex);
+        for (var i = 1, start; i < match.length; i++) {
+            start = str_body.indexOf(match[i], rt[0]);
+            rt.push(start);
+            rt.push(start + match[i].length);
+        }
+    }
+    return rt;
+}
+
+
 function process_replace (str_body, str_regx, str_rpla,
                           dot_p, case_p, ext_p, eval_p,
                           limit, pos_start, rgn_beg, rgn_end,
@@ -5271,22 +5281,11 @@ function process_replace (str_body, str_regx, str_rpla,
         while (((limit == null) ? true : (count < limit))
                && ((regx.lastIndex = cur_pos) ? true : true)
                && (match = regx.exec(str_body))) {
-            
-            var lmi = NATIVES.lastMatchInfo;
-            
-            // NOTE: lastMatchInfo seems to be broken when
-            //       some I/O operations has been run.
-            //       (I dunno why this happens...)
-            //       So I save the original values of lastMatchInfo.
-            var tmp = [];
-            var lmi_len = lmi.length;
-            for (var i = 0; i < lmi_len; ++i) {
-                tmp[i] = lmi[i];
-            }
-            lmi = tmp;
-            
+
+            var lmi = get_match_pos(regx, match, str_body);
+
             var num_capture = match.length - 1;
-            var offset = 3; // from `macro CAPTURE(index)' in macros.py
+            var offset = 0;
             
             var match_beg = lmi[offset + 0];
             var match_end = lmi[offset + 1];
@@ -5603,7 +5602,7 @@ main()
  :indicator-separator            "")
 
 (foreign-regexp/regexp-type/define
- :name 'javascript
+ :name 'python
  :tag "Python"
  :input-coding-system           'utf-8-unix
  :output-coding-system          'utf-8-unix
