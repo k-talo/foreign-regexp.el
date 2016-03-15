@@ -738,7 +738,7 @@ When LIMIT is NIL, match won't be limited.
                    (lambda (regexp &optional bound noerror count)
                      (cond
                       ((memq regexp ,g-regexp-lst)
-                       (funcall 'foreign-regexp/search/forward
+                       (funcall #'foreign-regexp/search/forward
                                 regexp bound noerror count ,g-limit))
                       (t
                        (funcall ,g-orig-re-fwd-fn 
@@ -747,7 +747,7 @@ When LIMIT is NIL, match won't be limited.
                    (lambda (regexp &optional bound noerror count)
                      (cond
                       ((memq regexp ,g-regexp-lst)
-                       (funcall 'foreign-regexp/search/backward
+                       (funcall #'foreign-regexp/search/backward
                                 regexp bound noerror count ,g-limit))
                       (t
                        (funcall ,g-orig-re-bkwd-fn
@@ -1155,7 +1155,7 @@ current cursor position in minibuffer."
 current match-data as a side effect.
 This is a side effect free version of `ad-enable-advice'."
   (let ((orig-match-data (match-data)))
-    (apply 'ad-enable-advice args)
+    (apply #'ad-enable-advice args)
     (set-match-data orig-match-data)))
 
 ;; ----------------------------------------------------------------------------
@@ -1166,7 +1166,7 @@ This is a side effect free version of `ad-enable-advice'."
 current match-data as a side effect.
 This is a side effect free version of `ad-disable-advice'."
   (let ((orig-match-data (match-data)))
-    (apply 'ad-disable-advice args)
+    (apply #'ad-disable-advice args)
     (set-match-data orig-match-data)))
 
 ;; ----------------------------------------------------------------------------
@@ -1177,7 +1177,7 @@ This is a side effect free version of `ad-disable-advice'."
 current match-data as a side effect.
 This is a side effect free version of `ad-activate'."
   (let ((orig-match-data (match-data)))
-    (apply 'ad-activate args)
+    (apply #'ad-activate args)
     (set-match-data orig-match-data)))
 
 ;; ----------------------------------------------------------------------------
@@ -2009,7 +2009,7 @@ Also list in REPLACEMENT and REPEAT-COUNT are not supported."
          (match-again t)
          (message
           (if query-flag
-              (apply 'propertize
+              (apply #'propertize
                      (substitute-command-keys
                       "Query replacing %s with %s: (\\<query-replace-map>\\[help] for mini buffer help) ")
                      minibuffer-prompt-properties)))
@@ -3425,7 +3425,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
                                                   
                                                   (foreign-regexp/read-from-minibuf/with-initial-contents regexp
                                                                                                           (let ((this-command 'foreign-regexp/query-replace))
-                                                                                                            (call-interactively 'foreign-regexp/query-replace)))))
+                                                                                                            (call-interactively #'foreign-regexp/query-replace)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/re-builder/occur-on-target-buffer) => VOID
@@ -3440,7 +3440,7 @@ NOTE: RE-VAR will be defined as lexical variable by this macro."
   (foreign-regexp/re-builder/exec-with-current-re regexp
                                                   (foreign-regexp/read-from-minibuf/with-initial-contents regexp
                                                                                                           (let ((this-command 'foreign-regexp/occur))
-                                                                                                            (call-interactively 'foreign-regexp/occur)))))
+                                                                                                            (call-interactively #'foreign-regexp/occur)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/re-builder/isearch-forward-on-target-buffer) => VOID
@@ -3496,7 +3496,7 @@ current RE on `reb-target-buffer'."
   (foreign-regexp/re-builder/exec-with-current-re regexp
                                                   (foreign-regexp/read-from-minibuf/with-initial-contents regexp
                                                                                                           (let ((this-command 'foreign-regexp/non-incremental/search-forward))
-                                                                                                            (call-interactively 'foreign-regexp/non-incremental/search-forward)))))
+                                                                                                            (call-interactively #'foreign-regexp/non-incremental/search-forward)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/re-builder/non-incremental-search-backward-on-target-buffer)
@@ -3512,7 +3512,7 @@ current RE on `reb-target-buffer'."
   (foreign-regexp/re-builder/exec-with-current-re regexp
                                                   (foreign-regexp/read-from-minibuf/with-initial-contents regexp
                                                                                                           (let ((this-command 'foreign-regexp/non-incremental/search-backward))
-                                                                                                            (call-interactively 'foreign-regexp/non-incremental/search-backward)))))
+                                                                                                            (call-interactively #'foreign-regexp/non-incremental/search-backward)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/re-builder/align-on-target-buffer) => VOID
@@ -3527,7 +3527,7 @@ current RE on `reb-target-buffer'."
   (foreign-regexp/re-builder/exec-with-current-re regexp
                                                   (foreign-regexp/read-from-minibuf/with-initial-contents regexp
                                                                                                           (let ((this-command 'foreign-regexp/align))
-                                                                                                            (call-interactively 'foreign-regexp/align)))))
+                                                                                                            (call-interactively #'foreign-regexp/align)))))
 
 ;; ----------------------------------------------------------------------------
 ;;  (foreign-regexp/re-builder/toggle-case-fold-on-target-buffer
@@ -3919,7 +3919,7 @@ to each search option changed hook."
   (prog1
       (cond
        ((called-interactively-p 'interactive)
-        (call-interactively 'foreign-regexp/search/forward))
+        (call-interactively #'foreign-regexp/search/forward))
        (t
         (foreign-regexp/search/forward regexp)))
     (setq menu-bar-last-search-type 'foreign-regexp)))
@@ -3934,7 +3934,7 @@ to each search option changed hook."
   (prog1
       (cond
        ((called-interactively-p 'interactive)
-        (call-interactively 'foreign-regexp/search/backward))
+        (call-interactively #'foreign-regexp/search/backward))
        (t
         (foreign-regexp/search/backward regexp)))
     (setq menu-bar-last-search-type 'foreign-regexp)))
@@ -4119,7 +4119,7 @@ transition to another foreign-regexp command."
                                `((case reb-re-syntax
                                    ((foreign-regexp)
                                     (let ((this-command (quote ,targ-command)))
-                                      (call-interactively (quote ,targ-command)))
+                                      (call-interactively (function ,targ-command)))
                                     (with-current-buffer (get-buffer reb-buffer)
                                       (delete-region (point-min) (point-max))
                                       (insert regexp)))
@@ -4134,7 +4134,7 @@ transition to another foreign-regexp command."
                                     (foreign-regexp/read-from-minibuf/with-initial-contents
                                      regexp
                                      (let ((this-command (quote ,targ-command)))
-                                       (call-interactively (quote ,targ-command))))))))))))
+                                       (call-interactively (function ,targ-command))))))))))))
                     ;; Should be turned on by `isearch-mode-hook'.
                     (foreign-regexp/ad-disable (quote ,targ-command) 'around (quote ,ad-name-make-transition-to))
                     (foreign-regexp/ad-activate (quote ,targ-command))
@@ -4209,11 +4209,11 @@ And remember running command to prevent duplicate calls."
                                       (setq foreign-regexp/transition/.running-cmd this-command)
                                       
                                       (setq ad-return-value
-                                            (call-interactively (quote ,orig-command))))
+                                            (call-interactively (function ,orig-command))))
                                   (setq foreign-regexp/transition/.running-cmd nil))
                               ;; Called non-interactively.
                               (setq ad-return-value
-                                    (apply (quote ,orig-command) args))))
+                                    (apply (function ,orig-command) args))))
                           (foreign-regexp/ad-activate (quote ,command))))
                  (nconc
                   retval
@@ -4282,7 +4282,7 @@ while this function is running."
                                                                `((case reb-re-syntax
                                                                    ((foreign-regexp)
                                                                     (let ((this-command (quote ,targ-command)))
-                                                                      (call-interactively (quote ,targ-command)))
+                                                                      (call-interactively (function ,targ-command)))
                                                                     (with-current-buffer (get-buffer reb-buffer)
                                                                       (delete-region (point-min) (point-max))
                                                                       (insert regexp)))
@@ -4300,7 +4300,7 @@ while this function is running."
                                                                                                       (setq isearch-string  regexp
                                                                                                             isearch-message regexp)))
                                                                     (let ((this-command (quote ,targ-command)))
-                                                                      (call-interactively (quote ,targ-command)))))))
+                                                                      (call-interactively (function ,targ-command)))))))
                                                               ((minibuf-cmd)
                                                                `((run-with-idle-timer
                                                                   0 nil
@@ -4310,7 +4310,7 @@ while this function is running."
                                                                     (foreign-regexp/read-from-minibuf/with-initial-contents
                                                                      regexp
                                                                      (let ((this-command (quote ,targ-command)))
-                                                                       (call-interactively (quote ,targ-command)))))))))
+                                                                       (call-interactively (function ,targ-command)))))))))
                                                           ;; FIXME: Turn off an annoying message
                                                           ;;        "Back to top level.".
                                                           (top-level)))))
