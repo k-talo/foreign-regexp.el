@@ -4209,11 +4209,21 @@ And remember running command to prevent duplicate calls."
                                       (setq foreign-regexp/transition/.running-cmd this-command)
                                       
                                       (setq ad-return-value
-                                            (call-interactively (function ,orig-command))))
+                                            (call-interactively 
+                                             (cond
+                                              ((fboundp (quote ,orig-command))
+                                               (function ,orig-command))
+                                              (t
+                                               (ad-get-orig-definition (quote ,command)))))))
                                   (setq foreign-regexp/transition/.running-cmd nil))
                               ;; Called non-interactively.
                               (setq ad-return-value
-                                    (apply (function ,orig-command) args))))
+                                    (apply (cond
+                                            ((fboundp (quote ,orig-command))
+                                             (function ,orig-command))
+                                            (t
+                                             (ad-get-orig-definition (quote ,command))))
+                                     args))))
                           (foreign-regexp/ad-activate (quote ,command))))
                  (nconc
                   retval
