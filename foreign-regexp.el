@@ -3857,7 +3857,7 @@ to each search option changed hook."
 ;;       *RE-Builder* buffer. So here we made a patch which corrects
 ;;       that behavior.
 
-(defvar foreign-regexp/re-builder/targ-buf-state/.orig-pt)
+(defvar foreign-regexp/re-builder/targ-buf-state/.orig-pt nil)
 
 
 ;; ----------------------------------------------------------------------------
