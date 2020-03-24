@@ -1507,7 +1507,7 @@ and `foreign-regexp/re-builder/occur-on-target-buffer'."
                          :style    radio
                          :selected (and (foreign-regexp/case-fold-available-p)
                                         (if isearch-mode
-                                            (insert )search-case-fold-search
+                                            search-case-fold-search
                                             case-fold-search))
                          :active   (foreign-regexp/case-fold-available-p)]
                         [". Matches a Newline" foreign-regexp/toggle-dot-match
