@@ -2351,7 +2351,9 @@ Each overlay has a replacement text as property
 foreign-regexp/replace/replacement."
   (let ((ov (make-overlay beg end buf nil nil)))
     (when query-replace-lazy-highlight
-      (overlay-put ov 'face lazy-highlight-face))
+      (overlay-put ov 'face (if (boundp 'lazy-highlight-face)
+                                lazy-highlight-face ;;  obsolete since 22.1
+                              'lazy-highlight)))
     (overlay-put ov 'foreign-regexp/replace/replacement replacement)
     (overlay-put ov 'priority 1000)
     (setq foreign-regexp/replace/ovs-on-match/data
