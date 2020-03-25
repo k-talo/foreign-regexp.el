@@ -1020,6 +1020,7 @@ This is workaround for this behavior."
   (call-process "sh" ;; XXX: Shoud we use `shell-file-name'?
                 nil buffer nil "-c"
                 (apply #'concat
+                       "exec "
                        (shell-quote-argument program) " "
                        (mapcar #'(lambda (arg)
                                    (concat (shell-quote-argument arg) " "))
